@@ -27,8 +27,10 @@ CSR address bits [11:10] = 11 and bits [9:8] = 00..11 => M-mode CSRs
 CSR address bits [11:10] = 01 => S-mode CSRs
 CSR address bits [11:10] = 00 => U-mode CSRs (performance counters)
 
-Read-only CSRs: bits [11:10] = 11 AND bits [9:8] = 11
+Read-only CSRs: bits [11:10] = 11
   e.g. mvendorid (0xF11), marchid (0xF12), mimpid (0xF13)
+  Note: [11:10]=11 encodes read-only regardless of [9:8]. cycle (0xC00) is
+  user-accessible and read-only: [11:10]=11, [9:8]=00.
 ```
 
 The hardware checks the current privilege level against bits [11:10] on every CSR instruction. An access at insufficient privilege raises an **illegal instruction exception** (mcause = 2), and the CSR is not touched.
@@ -71,7 +73,7 @@ CSRRSI rd, csr, uimm  =>  t = CSR[csr]; CSR[csr] |= uimm; rd = t
 CSRRCI rd, csr, uimm  =>  t = CSR[csr]; CSR[csr] &= ~uimm; rd = t
 ```
 
-Important: if `rd = x0`, the read side-effect is suppressed for CSRRS/CSRRC/CSRRSI/CSRRCI. This allows writing a CSR without a wasted register read. If `rs1 = x0` (or `uimm = 0`) for CSRRS/CSRRC, the write is suppressed, making it a pure CSR read.
+Important: if `rs1 = x0` (or `uimm = 0`) for CSRRS/CSRRC/CSRRSI/CSRRCI, the write side-effect is suppressed, making it a pure CSR read. For CSRRW only, if `rd = x0`, the read side-effect is suppressed. This allows reading a CSR without a wasted register write (CSRRS/CSRRC with rs1=x0) or writing a CSR without a wasted register read (CSRRW with rd=x0).
 
 Canonical pseudo-instructions:
 
@@ -466,12 +468,14 @@ The 12-bit CSR address encodes the minimum access privilege in its top bits. The
 
 ```
 CSR address [11:10]:
-  00 or 01  =>  accessible from U-mode and above
+  00        =>  accessible from U-mode and above (includes user-accessible read-only CSRs)
+  01        =>  accessible from S-mode (or H-mode) and above
   10        =>  accessible from S-mode (or H-mode) and above
-  11        =>  accessible from M-mode only
+  11        =>  accessible from M-mode only, OR user-accessible read-only CSRs (0xC00–0xCFF)
 
-Additionally, [11:10] = 11 with [9:8] = 11 => read-only CSR
+[11:10] = 11 => read-only CSR (regardless of [9:8])
   Attempt to write a read-only CSR raises illegal instruction exception.
+  Counter-example: cycle=0xC00 has [11:10]=11 and [9:8]=00, yet is user-accessible and read-only.
 ```
 
 If the current privilege level is lower than required by `csr[11:10]`, the instruction raises an **illegal instruction exception** (`mcause = 2`) and the CSR state is not changed. This check happens before any other CSR-specific logic.

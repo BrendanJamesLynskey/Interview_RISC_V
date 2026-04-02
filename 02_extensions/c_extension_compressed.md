@@ -287,7 +287,7 @@ The immediate field is 6 bits, representing a byte offset scaled by 4 (word gran
 - **Range:** 0 to 252 bytes from `sp`.
 - **Granularity:** 4 bytes (word-aligned stores only).
 
-The CSS format encodes `imm[5:2]` in `inst[12:9]` and `imm[7:6]` in `inst[8:7]`. Wait — for C.SWSP the encoding is:
+For C.SWSP the immediate encoding is:
 
 ```
 [15:13] = 110 (funct3)

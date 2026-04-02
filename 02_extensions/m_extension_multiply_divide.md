@@ -149,7 +149,7 @@ Software is responsible for checking the divisor before dividing if a zero divis
 
 **Answer:**
 
-Wait — the divisor here is `x1 = 0x80000000 = INT_MIN`, not `-1`. Dividing INT_MIN by INT_MIN:
+The divisor here is `x1 = 0x80000000 = INT_MIN`, not `-1`. Dividing INT_MIN by INT_MIN:
 
 - Mathematical result: 1 (INT_MIN / INT_MIN = 1).
 - 1 is representable as a signed 32-bit integer.

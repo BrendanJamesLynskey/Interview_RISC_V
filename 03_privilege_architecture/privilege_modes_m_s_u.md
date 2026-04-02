@@ -173,7 +173,7 @@ After reset:
 
 **Answer:**
 
-`ecall` (Environment Call) is a U32 instruction (opcode `SYSTEM`, funct3=0, funct12=0) that generates a synchronous exception, transferring control to the trap handler at a higher privilege level.
+`ecall` (Environment Call) is an I-type instruction (opcode `SYSTEM`, funct3=0, funct12=0) that generates a synchronous exception, transferring control to the trap handler at a higher privilege level.
 
 - From U-mode: generates exception cause `Environment call from U-mode` (cause 8). Typically delegated to S-mode for POSIX system calls.
 - From S-mode: generates exception cause `Environment call from S-mode` (cause 9). Used to request services from M-mode firmware (via the SBI — Supervisor Binary Interface).

@@ -736,7 +736,7 @@ alloca_example:
 
     # Epilogue
     mv   sp, fp           # restore sp = fp (undoes ALL alloca allocations)
-    addi sp, sp, -32      # ... wait, we saved fp at sp+24, so:
+    # (epilogue: restore sp = fp, then restore saved fp and ra at fp-relative offsets)
     lw   fp, -8(fp)       # restore saved fp: fp pointed 32 bytes above prologue sp,
                           # saved fp is at fp-8... (depends on frame layout)
     lw   ra, -4(fp)

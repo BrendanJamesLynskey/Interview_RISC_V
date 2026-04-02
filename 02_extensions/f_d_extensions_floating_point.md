@@ -285,9 +285,8 @@ The sign-injection instructions copy all bits of `rs1` (magnitude and exponent) 
 Common operations they implement:
 
 ```asm
-# Absolute value: |a| = FSGNJ rd, rs1, rs1
-# (uses rs1 for both operands; sign bit is XOR of itself = 0... wait, FSGNJ not FSGNJX)
-# FSGNJ rd, rs1, positive_zero would work, but the idiom is:
+# Absolute value: |a| -- FSGNJ rd, rs1, rs1 copies the sign from rs1 to rd (same register),
+# which is a NOP (not useful for abs). The correct idiom uses FSGNJX:
 fsgnj.s  fa0, fa0, fa0   # Not useful; this is a NOP (sign from itself)
 
 # Actually the idiomatic absolute value:

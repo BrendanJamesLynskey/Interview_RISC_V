@@ -458,7 +458,7 @@ skip_near:
 0xA014:  ...  (skip label, where execution resumes after the if)
 ```
 
-But wait: `skip_near` is not `skip`. The condition is inverted:
+Note: `skip_near` is not `skip`. The condition is inverted:
 - Original: `if (a0 == a1) goto skip` (skip the true block)
 - Inverted: `if (a0 != a1) goto skip_near` (if not-taken, skip_near is the first instruction of the true block, only 4 bytes away from the BNE)
 - The JAL at `0x8014` jumps to `skip` (the far target)
@@ -499,26 +499,13 @@ offset = 0xA014 - 0x8014 = 0x2000 = 8192
   bit 13 = 1 (8192 = 2^13)
   others = 0
 
-imm[20]   = 0
-imm[19:12]= bits 19:12 = 00100000 (bit13=1 is at imm[13])
+8192 = 0x2000, so bit 13 of the offset = 1, all others 0.
 
-Wait: 8192 = 2^13
-  bit 13 of offset = 1
-
-imm[19:12] extracts bits 19 down to 12:
-  bit13=1, bit12=0 => imm[19:12] = 0000_0010 (bit13-12 = "10" in the byte)
-  Actually: the 8 bits from bit19 to bit12: 00100000 (bit13=1 at position 1 within this byte)
-
-Let me re-examine:
-  8192 = 0x2000
-  Bits numbered from 0:
-    bit 13 = 1, all others 0
-
-  imm[20]   = bit20 = 0
-  imm[19:12]= bits 19 down to 12 = {bit19, bit18, ..., bit13, bit12}
-             = {0, 0, 0, 0, 0, 0, 1, 0}
-             = 00000010
-  imm[11]   = bit11 = 0
+imm[20]   = bit20 = 0
+imm[19:12]= bits 19 down to 12 = {bit19, bit18, ..., bit13, bit12}
+           = {0, 0, 0, 0, 0, 0, 1, 0}
+           = 00000010
+imm[11]   = bit11 = 0
   imm[10:1] = bits 10:1 = 0000000000
 
 inst[31]   = imm[20]   = 0
@@ -577,9 +564,8 @@ This is a plain unconditional jump (`J` pseudo-instruction), not a subroutine ca
 Step 4 — extract J-type immediate bits:
 ```
 inst[31]   = 1   => imm[20] = 1  (sign bit: negative offset)
-inst[30:21]= 1001100000 => imm[10:1] = 1001100000
 
-Wait, let me re-extract from binary:
+Re-extracting from binary:
 0xF61FF06F = 1111_0110_0001_1111_1111_0000_0110_1111
 
 Bit assignments:
@@ -709,15 +695,14 @@ Let me write as hex:
   Bit 0 = 0
 
 Full value:
-  1 1111 1111 1110 1100 000[0] (appending bit0=0)
-  Wait: bits 10:1 = 1110110000, so bit10=1,9=1,8=1,7=0,6=1,5=1,4=0,3=0,2=0,1=0
+  bits 10:1 = 1110110000 (bit10=1,9=1,8=1,7=0,6=1,5=1,4=0,3=0,2=0,1=0)
 
   All 21 bits from 20 to 0:
   1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,0,0,0,0,0
 
   = 1_1111_1111_1111_0110_0000 (grouping 20:0 in 4-bit groups plus leading bit)
   
-  Hmm, let me just compute the value:
+  Computing the value:
   imm[20]=1, magnitude bits:
     imm[19:12] = 11111111 = contributes to magnitude
     imm[11] = 1
@@ -772,32 +757,16 @@ Full value:
   bit0=0 (implicit)
 
   21-bit binary: 1_1111_1111_1111_0110_0000
-  
-  = 0x1FFFF60... wait:
-  Let me convert: 1 1111 1111 1110 1100 0000
-  Actually grouping from bit20 to bit0 in groups of 4:
-  bits 20-17: 1111
-  bits 16-13: 1111
-  bits 12-9:  1111
-  bits 8-5:   0110  (bit8=1,7=0,6=1,5=1)
 
-  Hmm, bit8=1 but above I said bit8=imm[8] = third bit of imm[10:1].
-  imm[10:1] = 1110110000 (10 bits, imm[10] is MSB, imm[1] is LSB)
-  So: imm[10]=1, imm[9]=1, imm[8]=1, imm[7]=0, imm[6]=1, imm[5]=1, imm[4]=0, imm[3]=0, imm[2]=0, imm[1]=0
+  imm[10:1] = 1110110000 (imm[10]=1, imm[9]=1, imm[8]=1, imm[7]=0, imm[6]=1, imm[5]=1, imm[4:1]=0000)
 
-  So bit8=1. Let me redo:
+  Grouping from bit20 to bit0 in groups of 4:
   bits 20-17: 1111 = 0xF
   bits 16-13: 1111 = 0xF
   bits 12-9:  1111 = 0xF (bit12=1, bit11=1, bit10=1, bit9=1)
   bits 8-5:   1011 = 0xB (bit8=1, bit7=0, bit6=1, bit5=1)
   bits 4-1:   0000 = 0x0
   bit 0:      0
-
-  21-bit value: 0x1FFFB0? No:
-  {1,1,1,1, 1,1,1,1, 1,1,1,1, 1,0,1,1, 0,0,0,0,0}
-              ^bit20               ^bit8       ^bit0
-
-  Hmm this is getting messy. Let me just compute the signed value directly.
 
   As unsigned 21-bit:
   = 2^20 + 2^19 + 2^18 + 2^17 + 2^16 + 2^15 + 2^14 + 2^13 + 2^12 + 2^11 + 2^10 + 2^9 + 2^8 + 2^6 + 2^5
@@ -830,14 +799,8 @@ Step 8 — verify by re-encoding `JAL x0, -160` at `0x1080`:
 ```
 offset = -160
 -160 in 21-bit two's complement:
-  160 = 0b0000_0000_0000_1010_0000 (21 bits, bit7=1, bit5=1... wait)
-  160 = 128 + 32 = 2^7 + 2^5
-
-  21-bit +160: bits 7 and 5 are set, all others 0
-  Invert: all bits 1 except bits 7 and 5
-  Add 1: (all 1s except bits 7,5) + 1
-
-  Let me just state -160 in binary:
+  160 = 128 + 32 = 2^7 + 2^5 (21-bit: bits 7 and 5 are set, all others 0)
+  -160 in binary:
   -160 = 0xFFFFFF60 (32-bit)
   Lower 21 bits: 0xFFFFFF60 & 0x1FFFFF = 0x1FFFFC0?
 
@@ -858,46 +821,11 @@ offset = -160
   0x1FFF60 in binary (21 bits):
   = 1_1111_1111_1111_0110_0000
 
-  Bits:
-  bit20=1, bit19=1,...,bit13=1, bit12=1, bit11=1, bit10=1, bit9=1, bit8=1
-  bit7=1, bit6=0, bit5=1, bit4=1, bit3=0, bit2=0, bit1=0, bit0=0
-
-  Wait: 0x1FFF60:
-  1 = 0001
-  F = 1111
-  F = 1111
-  F = 1111
-  6 = 0110
-  0 = 0000
-  That's 24 bits. For 21 bits: 0x1FFF60 = 1_1111_1111_1111_0110_0000
-
-  Hmm: 0x60 = 0110 0000, so bits 7:0 = 0110 0000
-  bit7=0, bit6=1, bit5=1, bit4=0, bit3=0, bit2=0, bit1=0, bit0=0
-
-  This doesn't match what I computed earlier. Let me be very careful.
-
-  -160 = -(128+32) = -(0x80 + 0x20) = -0xA0
-
-  -0xA0 in two's complement:
-  +0xA0 = 1010 0000
-  ~0xA0 = 0101 1111
-  +1    = 0110 0000
-
-  So -160 (8-bit) = 0x60 = 0110 0000
-  Sign extended to 21 bits:
-  = 1_1111_1111_1111_0110_0000
+  0x1FFF60 in binary: 0x60 = 0110_0000, so bits 7:0 = 0110_0000
+  (confirming -0xA0 = 0x60 in 8-bit two's complement, sign-extended to 21 bits)
 
   bit20=1, bit19=1,...bit8=1 (all ones from bit20 to bit8)
-  bit7=0
-  bit6=1
-  bit5=1
-  bit4=0
-  bit3=0
-  bit2=0
-  bit1=0
-  bit0=0
-
-Ah, I see my error earlier. bit7=0. Let me redo:
+  bit7=0, bit6=1, bit5=1, bit4=0, bit3=0, bit2=0, bit1=0, bit0=0
 
 imm[20:0] = 1_1111_1111_1111_0110_0000
 
@@ -905,24 +833,14 @@ Extract J-type sub-fields:
   imm[20]   = bit20 = 1
   imm[19:12]= bits 19:12 = 1111_1111
   imm[11]   = bit11 = 1
-  imm[10:1] = bits 10:1  = 1111_0110_00 (bit10=1,9=1,8=1,7=0,6=1,5=1,4=0,3=0,2=0,1=0)
-  
-  Wait: the 21-bit value from MSB to LSB (bit 20 to bit 0):
+  imm[10:1] = bits 10:1  = 1110110000
+
+  The 21-bit value from MSB to LSB (bit 20 to bit 0):
   1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,0,0,0,0,0
 
-  bit20=1
-  bit19=1
-  bit18=1
-  bit17=1
-  bit16=1
-  bit15=1
-  bit14=1
-  bit13=1
-  bit12=1
-  bit11=1
-  bit10=1
-  bit9=1
-  bit8=1
+  bit20=1, bit19=1, bit18=1, bit17=1, bit16=1
+  bit15=1, bit14=1, bit13=1, bit12=1, bit11=1
+  bit10=1, bit9=1, bit8=1
   bit7=0
   bit6=1
   bit5=1

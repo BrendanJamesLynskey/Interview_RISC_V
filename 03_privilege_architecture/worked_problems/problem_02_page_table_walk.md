@@ -179,7 +179,7 @@ V = bit 0 = 0 (INVALID!)
 => PAGE FAULT
 ```
 
-Wait — let us re-examine the level-1 page table B entries. The entry at offset 0xFF8 is the last entry (index 511), not offset 0. Offset 0 is zero.
+Re-examining: the entry at offset 0xFF8 is the last entry (index 511), not offset 0. Offset 0 is zero.
 
 ```
 PTE at 0x8001_0000 (offset 0, index 0) = 0x0000_0000_0000_0000
@@ -345,7 +345,7 @@ Result: Store is **permitted**.
 
 Physical address: PPN = `0x80014` => PA = `0x8001_4000 + 0x008` = `0x8001_4008`.
 
-Wait — VPN[0]=0 maps to PTE at offset 0, PPN = 0x80014 (from the first PTE `0x2005_00C7`):
+VPN[0]=0 maps to PTE at offset 0, PPN = 0x80014 (from the first PTE `0x2005_00C7`):
 ```
 0x2005_00C7 >> 10 = 0x80014
 PA = 0x80014 * 0x1000 + 0x008 = 0x8001_4008

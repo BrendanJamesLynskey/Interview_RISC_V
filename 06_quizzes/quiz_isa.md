@@ -166,7 +166,7 @@ Which answer is correct?
 
 - A) Opcode `0010011`, `ADDI x10, x10, 10`
 - B) Opcode `0000011`, `LW x10, 10(x10)`
-- C) Opcode `0010011`, `ADDI x11, x10, 10` -- wait, let the bits speak: rd=x10, rs1=x10, imm=10
+- C) Opcode `0010011`, `ADDI x11, x10, 10`
 - D) Opcode `0010011`, `SLTI x10, x10, 10`
 
 ---
@@ -210,7 +210,7 @@ encoding a combination of I, O, R, W. What do these operands specify?
 | 5  | C      | Fundamentals  |
 | 6  | C      | Intermediate  |
 | 7  | A      | Intermediate  |
-| 8  | A      | Intermediate  |
+| 8  | B      | Intermediate  |
 | 9  | C      | Intermediate  |
 | 10 | C      | Intermediate  |
 | 11 | C      | Intermediate  |
@@ -309,14 +309,14 @@ file read addresses to be decoded before the instruction type is fully known.
 
 ---
 
-### Q8 - Answer: A (+/- 2 KB)
+### Q8 - Answer: B (+/- 4 KB)
 
 The B-type immediate encodes a 13-bit signed offset (bits [12:1], with bit 0 implicitly
-0). The range is -4096 to +4094 bytes, which is just under +/- 4 KB in absolute terms,
-but conventionally described as +/- 2 KB because the offset is signed and the effective
-range from any given PC is 2^12 = 4096 bytes total (2048 forward, 2048 backward).
+0). The range is -4096 to +4094 bytes. The maximum forward reach is +4094 bytes and the
+maximum backward reach is -4096 bytes, giving an approximately +/- 4 KB range.
 
-- **B (+/- 4 KB)** confuses the total range with the one-sided signed range.
+- **A (+/- 2 KB)** understates the range by half; 2^12 = 4096 bytes is the one-sided
+  magnitude, not 2048.
 - **C and D** describe much larger ranges that require U-type or J-type encodings.
 
 ---

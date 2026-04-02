@@ -74,7 +74,7 @@ Example: ADD x3, x1, x2
   funct7 = 0000000  (ADD; 0100000 would be SUB)
 
 Binary: 0000000 00010 00001 000 00011 0110011
-Hex:    0x00208133
+Hex:    0x002081B3
 ```
 
 ### I-type (Immediate)
@@ -231,11 +231,7 @@ Example: JAL x1, +100   (call subroutine 100 bytes ahead, save return address in
     imm[20]   = 0
     imm[19:12]= 00000000
     imm[11]   = 0
-    imm[10:1] = 0001100100  (100 >> 1 = 50 = 0b0001100100... wait, 50 = 0b0110010)
-               (100 in binary = 1100100, shift right 1 = 110010 = bits [10:1] = 0001100100)
-    Corrected: 100 = 64h = 0110 0100b
-    imm[10:1] = 0011 00100 0  => 0011001000 (note: bit0 is implicit 0)
-                Actually: 100 / 2 = 50 = 0b00110010 => imm[10:1] = 0000110010
+    imm[10:1] = 0000110010  (100 / 2 = 50 = 0b00110010, in 10 bits: 0000110010)
 
   opcode    = 1101111  (JAL)
   rd        = 00001    (x1 = ra)

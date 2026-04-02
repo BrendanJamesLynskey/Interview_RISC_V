@@ -356,8 +356,7 @@ strlen:
     ld    t1, 0(t0)       # load 8 bytes
     orc.b t2, t1          # each byte of t2: 0xFF if source byte nonzero, 0x00 if zero
     # We want to find bytes that are 0x00 in t1.
-    # After ORC.B: zero bytes in t1 become 0x00 in t2 (since orc.b sets byte to 0 only if input byte is 0)
-    # Wait: orc.b sets byte to 0xFF if nonzero, 0x00 if zero.
+    # ORC.B sets each output byte to 0xFF if the input byte is nonzero, 0x00 if zero.
     # So: NOT t2 gives 0xFF for each ZERO byte, 0x00 for nonzero bytes.
     not   t2, t2          # t2: 0xFF for each zero byte, 0x00 for nonzero
     # Now find the position of the first 0xFF byte (= first zero in original string)
@@ -431,8 +430,7 @@ rev8_rv32:
     srli  a0, a0, 8
     and   a0, a0, t0        # a0 = 0x00AA00CC
     slli  t1, t1, 8         # t1 = 0xBB00DD00
-    or    a0, a0, t1        # a0 = 0xBBAADDCC  -- wait, this isn't right either
-    # ... requires careful construction; typically 8-10 instructions total
+    or    a0, a0, t1        # a0 = 0xBBAADDCC  (requires careful bit construction; typically 8-10 instructions total)
 ```
 
 With `REV8`: one instruction.

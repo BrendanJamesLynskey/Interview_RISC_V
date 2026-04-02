@@ -441,7 +441,7 @@ Assembly:
   addi a0, a0, -273      # a0 = 0xDEADBEEF (assembler accepts hex: addi a0, a0, 0xEEF)
 
 Encoding:
-  LUI:  0xDEADC7B7  -- imm[31:12]=0xDEADC, rd=01111 (x15... wait, a0=x10)
+  LUI:  0xDEADC7B7  -- imm[31:12]=0xDEADC, rd=01010 (a0=x10)
   Let rd = x10 = 01010:
   LUI:  imm[31:12]=0xDEADC, rd=01010, opcode=0110111
         0xDEADC000 | 0x537 = ...

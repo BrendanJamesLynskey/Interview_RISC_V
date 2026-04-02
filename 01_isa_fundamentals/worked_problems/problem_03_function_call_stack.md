@@ -147,9 +147,9 @@ ra         0x????     Just set by JAL to (address of JAL instruction + 4)
                       i.e., the return address pointing back into dot_product
 a0         3          x0 argument (first call: multiply(3, 5))
 
-Wait: multiply(x0, x1) = multiply(3, 5):
-  x0 = a0 = 3
-  x1 = a2 = 5, but we moved a2 into a1 for the call
+Note: multiply(a0, a1) = multiply(3, 5):
+  a0 = 3 (first argument)
+  a1 = 5 (second argument; the caller moved a2 into a1 for the call)
 a0         3          first argument to multiply
 a1         5          second argument to multiply
 ```
@@ -321,9 +321,9 @@ Address  Value              Owner           Contents
 
 ------ dot_product's stack frame (16 bytes, 0xBFDC to 0xBFEB) ------
 
-Wait: main's frame is 16 bytes, starting at sp=0xBFEC, occupying 0xBFEC to 0xBFFB.
+main's frame is 16 bytes, starting at sp=0xBFEC, occupying 0xBFEC to 0xBFFB.
   ra saved at 0xBFF8 (sp+12 = 0xBFEC+12 = 0xBFF8)
-  
+
 Then dot_product allocates another 16 bytes:
   sp goes from 0xBFEC to 0xBFDC (0xBFEC - 16 = 0xBFDC)
 

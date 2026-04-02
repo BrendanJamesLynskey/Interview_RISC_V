@@ -95,7 +95,7 @@ Quadrant 0, `funct3 = 110`: **C.SW** (stack-relative store, but actually CL/CS f
 
 C.SW format (CS format): `funct3 | imm[5:3] | rs1' | imm[2|6] | rs2' | op`
 
-Wait — let me re-extract carefully:
+Re-extracting carefully:
 
 ```
 Binary: 1100 0010 0100 1100
@@ -134,7 +134,7 @@ Re-checking: C.SW uses a 5-bit offset scaled by 4 (covering 0-124 bytes):
 [4:2]   = 011  → rs2' = x11 (a1)
 ```
 
-`uimm = {0, 000, 1, 0} * 4` → Wait, the fields assemble as `uimm[6:2] = {uimm[6], uimm[5:3], uimm[2]} = {0, 000, 1}` = `00001` = 1, and since this is scaled by 4: offset = 4 bytes.
+The fields assemble as `uimm[6:2] = {uimm[6], uimm[5:3], uimm[2]} = {0, 000, 1}` = `00001` = 1, and since this is scaled by 4: offset = 4 bytes.
 
 **Decoded:** `C.SW a1, 4(a2)`
 

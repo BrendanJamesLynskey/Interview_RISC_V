@@ -361,16 +361,9 @@ Physical address construction at level i=1:
 va = virtual address
 pte = leaf PTE at level 1
 
-pa[55:30] = pte.PPN[2:1]   # 26 bits from PTE: gigapage region
-pa[29:21] = pte.PPN[0]     # 9 bits from PTE: 2 MiB page region within giga
-            (actually: pa[29:21] = pte.PPN[0])
-pa[20:12] = va[20:12]      # va.VPN[0] (9 bits) from virtual address
-pa[11:0]  = va[11:0]       # page offset from virtual address
-
-Wait -- correction for Sv39 2 MiB superpage (leaf at level i=1):
-  pa[55:21] = pte.PPN[2:0] (all 44 bits of PPN, but pte.PPN[0] must be 0)
-  pa[20:12] = va.VPN[0]    (9 bits from VA, selects 4 KiB within the 2 MiB)
-  pa[11:0]  = va.offset    (12 bits, byte within the 4 KiB page)
+pa[55:21] = pte.PPN[2:0]   # all 44 bits of PPN (pte.PPN[0] must be 0 for alignment)
+pa[20:12] = va.VPN[0]      # 9 bits from VA, selects 4 KiB within the 2 MiB
+pa[11:0]  = va.offset      # 12 bits, byte within the 4 KiB page
 ```
 
 Alignment requirement: for a valid 2 MiB superpage, `pte.PPN[0]` must be 0. If it is non-zero, the hardware raises a page fault (misaligned superpage). This ensures the superpage is naturally aligned to a 2 MiB boundary.
@@ -492,10 +485,7 @@ Bits [38:30] = VPN[2]: extract bits 38 down to 30
   VA >> 30 = 0x3F4A >> 3 ... let's compute directly:
   0x3F_4ABC_1234 in binary, bits 38-30:
   0x3F_4ABC_1234 = 0b 0_0011_1111_0100_1010_1011_1100_0001_0010_0011_0100
-  bits 38-30 = 0_0011_1111_0  => 0b0_0011_1111_0 = wait, numbering:
-  bit 38 = (VA >> 38) & 1 = (0x3F_4ABC_1234 >> 38) & 1
-
-Let's use hex arithmetic:
+Using hex arithmetic to extract VPN fields:
   0x3F_4ABC_1234 >> 30 = 0x3F_4ABC_1234 / 0x4000_0000
   0x3F_4ABC_1234 = 272_070_099_508
   272_070_099_508 / 1_073_741_824 = 253 (0xFD)

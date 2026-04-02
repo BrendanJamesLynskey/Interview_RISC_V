@@ -416,7 +416,7 @@ Full flow for an external interrupt (e.g., a UART RX interrupt):
      PLIC asserts the MEI (Machine External Interrupt) line to hart 0.
 
 3. Hart 0 hardware:
-   - mip.MEIE is set by the PLIC assertion.
+   - mip.MEIP is set by the PLIC assertion.
    - If mstatus.MIE=1 and mie.MEIE=1:
      - Trap to M-mode: mcause = 0x8000000B (MEI)
      - mepc = interrupted PC
@@ -428,7 +428,7 @@ Full flow for an external interrupt (e.g., a UART RX interrupt):
    - Dispatches to uart_handler()
    - uart_handler() reads UART data register, clears UART interrupt flag.
    - Writes UART interrupt ID back to PLIC completion register
-     (this clears mip.MEIE if no other interrupts are pending)
+     (this clears mip.MEIP if no other interrupts are pending)
    - mret
 
 5. If S-mode PLIC context is used (interrupt delegated via mideleg):

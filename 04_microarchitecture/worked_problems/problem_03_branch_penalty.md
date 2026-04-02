@@ -56,13 +56,9 @@ Overall taken rate:
   = 0.570 + 0.150
   = 0.720
 
-Wait: the problem states 70% taken. Checking:
-  0.570 + 0.150 = 0.720 = 72%
-
-This does not exactly match 70%. Let us use the precise per-pattern values
-(72% taken overall) for the calculations, as the per-pattern data is more specific.
-The "70%" in the problem statement is an approximation. All subsequent calculations
-use the 72% precise figure.
+Note: the problem states 70% taken, but the precise per-pattern values give 72%.
+The "70%" in the problem statement is an approximation; all subsequent calculations
+use the 72% precise figure derived from the per-pattern data.
 ```
 
 **Verification:** 72% taken is consistent with a mix of frequently-taken loops (Pattern A) and less-frequently-taken forward branches (Pattern B). This is a realistic profile for embedded control code with several loops and moderate conditional logic.

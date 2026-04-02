@@ -194,29 +194,12 @@ Split the offset:
   8  = 0000_0000_1000
  -8  = 1111_1111_1000  (12-bit two's complement)
 
-imm[11:5] = upper 7 bits = 1111111  (all ones)
-imm[4:0]  = lower 5 bits = 11000    (wait: 1111_1111_1000, lower 5 bits = 11000? No)
-
-Let us be precise:
 -8 in 12-bit binary: 1111_1111_1000
                      ^bit11     ^bit0
 
-imm[11:5] = bits 11 down to 5 = 1111_111  (7 bits) = 1111111
-imm[4:0]  = bits 4 down to 0  = 1_1000    (5 bits) = 11000
-
-Wait: 1111_1111_1000
-  bit 11 = 1
-  bit 10 = 1
-  bit  9 = 1
-  bit  8 = 1
-  bit  7 = 1
-  bit  6 = 1
-  bit  5 = 1
-  bit  4 = 1
-  bit  3 = 1
-  bit  2 = 0
-  bit  1 = 0
-  bit  0 = 0
+  bit 11 = 1, bit 10 = 1, bit 9 = 1, bit 8 = 1
+  bit  7 = 1, bit  6 = 1, bit 5 = 1, bit 4 = 1
+  bit  3 = 1, bit  2 = 0, bit 1 = 0, bit 0 = 0
 
 imm[11:5] = bits[11:5] = 1111111
 imm[4:0]  = bits[4:0]  = 11000
@@ -337,10 +320,8 @@ Step 1 — represent -20 as a 13-bit signed value:
     bit  4 = 1
     bit  3 = 0
     bit  2 = 1
-    bit  1 = 1 ... wait, let me recompute:
-
 20 = 16 + 4 = 0b0000_0001_0100
-  bit 4 = 1 (16? No: 16 = 2^4, bit 4 = 1)
+  bit 4 = 1 (16 = 2^4)
   bit 2 = 1 (4 = 2^2)
   others = 0
 
@@ -416,14 +397,11 @@ inst[7]    = 1   => imm[11] = 1
 inst[30:25]= 111111 => imm[10:5] = 111111
 inst[11:8] = 0110   => imm[4:1] = 0110
 
-Full 13-bit: {1, 1, 111111, 0110, 0}
-= 1_1111_1110_1100_0  -- wait, let me reconstruct carefully:
+Full 13-bit reconstruction:
 {imm[12], imm[11], imm[10:5], imm[4:1], imm[0]}
 = {1, 1, 111111, 0110, 0}
-= 1_1_111111_0110_0
-= 1 1111 1101 1000 ... hmm
 
-Let me lay out the 13 bits:
+Laying out the 13 bits:
   Position: [12][11][10][9][8][7][6][5][4][3][2][1][0]
   Value:      1   1   1  1  1  1  1  1  0  1  1  0  0
 
@@ -473,9 +451,9 @@ Result:   a0 = 0x00001000 + 0xFFFFFABC = 0x00000ABC
            0x00001000 + 0xFFFFFABC = 0x00000ABC)
 ```
 
-Wait — rechecking: `0xABC = 2748` unsigned. As 12-bit signed: bit 11 of 0xABC is bit 11 of `1010 1011 1100` = 1 (the leading 1), so it is negative. `-1348 = 0xFFFFFABC`. Then `0x1000 + 0xFFFFFABC = 0x00000ABC`. So a0 = 0x00000ABC.
+Verification: `0xABC` as 12-bit signed has bit 11 set (1010_1011_1100), so it is negative: sign-extended = 0xFFFFFABC = -1348. Then `0x1000 + 0xFFFFFABC = 0x00000ABC`. So a0 = 0x00000ABC.
 
-Actually, let me re-examine the intent. This is loading `0x1ABC` into a0 via LUI + ADDI:
+This is loading a constant via LUI + ADDI:
 - Target: suppose the programmer wanted a0 = some constant.
 - LUI a0, 0x1 => a0 = 0x1000
 - ADDI a0, a0, 0xABC... but 0xABC has bit 11 set, so it sign-extends to -1348.

@@ -239,18 +239,7 @@ offset = 256 = 0x100 = 0b0000_0001_0000_0000_0000_0 (21-bit, bit 0 implicit)
   imm[20]   = 0
   imm[19:12]= 00000000
   imm[11]   = 0
-  imm[10:1] = 1000000000  (256 >> 1 = 128 = 0b10000000, in 10 bits: 0010000000)
-
-Wait, let us work through carefully:
-  256 = 0b0_0000_0001_0000_0000_0 (20 bits of offset, bit 0 = 0)
-  imm[20]   = 0
-  imm[19:12]= 0000_0000
-  imm[11]   = 0
-  imm[10:1] = 00_1000_0000  (bits 10 down to 1 of 256: 256 = 0x100,
-                              bits[10:1] = 0b0010000000 wait:
-                              256 in binary = 1_0000_0000
-                              imm[8] = 1, all others 0
-                              imm[10:1] = 0b0010000000 ... )
+  imm[10:1] = 0010000000  (256 = 2^8, so imm[8]=1, all other imm[10:1] bits 0)
 
 Precise bit layout of 256:
   bit 0  = 0  (implicit, always)

@@ -110,7 +110,7 @@ Branch squash at end of cycle 10 (BEQ resolves in EX):
 | 7     | 0x14 ADD  | BEQ x4    | bubble    | LW x3 MEM | ADD x2 WB |
 | 8     | 0x18 SUB  | 0x14 ADD  | MUL x4 EX | bubble    | LW x3 WB  |
 
-Wait — H3 must be re-examined. LW x3 is at 0x08, MUL x4 is at 0x0C. Let's recheck the cycle numbering carefully:
+H3 must be re-examined. LW x3 is at 0x08, MUL x4 is at 0x0C. Rechecking the cycle numbering:
 
 ```
 Corrected pipeline diagram (numbered by instruction entry into IF):
@@ -154,13 +154,10 @@ Precise cycle count:
   LW x3:  IF=3,  stall, ID=5,  EX=6,  MEM=7,  WB=8
   MUL x4: IF=5,  ID=6,  stall, EX=8,  MEM=9,  WB=10
   BEQ x4: IF=6,  ID=7 (stall), ID=8, EX=9
-             Wait: does BEQ also stall?
-             BEQ reads x4. MUL x4 is in EX in cycle 8 (its EX stage).
-             BEQ is in ID in cycle 8 (if BEQ entered IF in cycle 7).
-             After MUL stall, MUL is in EX cycle 8. BEQ in ID cycle 8.
-             EX/MEM forward will cover BEQ's need for x4 when BEQ reaches EX.
+             (BEQ reads x4; MUL x4 is in EX in cycle 8, BEQ is in ID in cycle 8.
+             EX/MEM forwarding covers BEQ's need: at cycle 9, EX/MEM contains MUL's
+             result which is forwarded to BEQ in EX. No additional stall for BEQ.)
              BEQ: IF=7, ID=8, EX=9. MUL: EX=8, MEM=9.
-             At cycle 9, EX/MEM contains MUL's result -> forwarded to BEQ in EX (cycle 9). OK.
 
   BEQ x4: IF=7, ID=8, EX=9 -> branch taken detected, MEM=10, WB=11
   0x14:   IF=8, ID=9 -> SQUASH at end of cycle 9 (BEQ resolves in EX cycle 9)

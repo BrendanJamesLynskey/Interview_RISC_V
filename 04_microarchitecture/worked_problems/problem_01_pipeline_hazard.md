@@ -62,7 +62,7 @@ Address  Instruction
 | Hazard | Resolution | Penalty |
 |--------|-----------|---------|
 | H1 (LW->ADD, x1, distance 1) | Hardware stall: 1 cycle | +1 cycle |
-| H2 (ADD->MUL, x2, distance 2) | MEM/WB -> EX forward | 0 cycles |
+| H2 (ADD->MUL, x2, distance 2) | Register file read (MUL's stalled ID coincides with ADD's WB; MEM/WB forward if no stall) | 0 cycles |
 | H3 (LW->MUL, x3, distance 1) | Hardware stall: 1 cycle | +1 cycle |
 | H4 (MUL->BEQ, x4, distance 1) | EX/MEM -> EX forward | 0 cycles |
 | Branch taken penalty | 2 instructions squashed (0x14, 0x18) | +2 cycles |
@@ -72,67 +72,30 @@ Address  Instruction
 ### Part 3: Pipeline Execution Diagram
 
 ```
-Cycle:      1    2    3    4    5    6    7    8    9   10   11   12   13   14   15
-0x00 LW x1: IF   ID   EX  MEM   WB
-0x04 ADD x2:     IF   ID [stl]  EX  MEM   WB         <- H1: stall after ID
-0x08 LW x3:          IF [stl]   ID   EX  MEM   WB    <- H1: also stalls in IF
-0x0C MUL x4:              [--]  IF   ID [stl]  EX  MEM  WB  <- H3: stall after ID
-0x10 BEQ x4:                         IF [stl]  ID   EX [...]
-0x14 ADD x5:                              [--]  IF [squash]  <- wrong path, squashed
-0x18 SUB x6:                                    IF [squash]  <- wrong path, squashed
-0x30 OR x7:                                          IF   ID   EX  MEM  WB
+Cycle:       1    2    3    4    5    6    7    8    9   10   11   12   13   14
+0x00 LW x1:  IF   ID   EX  MEM   WB
+0x04 ADD x2:      IF   ID  [st]  EX  MEM   WB                     <- H1: stall in cycle 4
+0x08 LW x3:            IF  [--]  ID   EX  MEM   WB                <- held in IF while ADD stalls
+0x0C MUL x4:                     IF   ID  [st]  EX  MEM   WB      <- H3: stall in cycle 7
+0x10 BEQ x4:                          IF  [--]  ID   EX           <- held in IF; resolves in EX, cycle 9
+0x14 ADD x5:                                    IF   ID  [sq]     <- wrong path, squashed
+0x18 SUB x6:                                         IF  [sq]     <- wrong path, squashed
+0x30 OR x7:                                               IF   ID   EX  MEM   WB
 
 Legend:
-  [stl] = stall bubble in ID/EX
-  [--]  = instruction frozen in IF or IF stage re-presents same address
-  [squash] = instruction flushed from IF (pipeline register zeroed)
+  [st] = stall bubble inserted into ID/EX (instruction repeats ID)
+  [--] = instruction frozen in IF (IF re-presents the same address)
+  [sq] = instruction flushed (pipeline register zeroed)
 
 Forwarding paths:
-  Cycle 6:  0x00 LW x1 in MEM/WB, 0x04 ADD x2 in EX  -> MEM/WB forward for x1
-            (This is the cycle after the stall; ADD's EX is cycle 6)
-  Cycle 9:  0x08 LW x3 in MEM/WB, 0x0C MUL x4 in EX  -> MEM/WB forward for x3
-  Cycle 9:  0x04 ADD x2 in MEM/WB (result), 0x0C MUL x4 in EX -> forward for x2
+  Cycle 5:  0x00 LW x1 in MEM/WB, 0x04 ADD x2 in EX  -> MEM/WB forward for x1
+  Cycle 7:  0x04 ADD x2 writes x2 in WB while 0x0C MUL x4 repeats ID -> read from the
+            register file (write in first half, read in second half)
+  Cycle 8:  0x08 LW x3 in MEM/WB, 0x0C MUL x4 in EX  -> MEM/WB forward for x3
+  Cycle 9:  0x0C MUL x4 in EX/MEM, 0x10 BEQ x4 in EX -> EX/MEM forward for x4
 
-Branch squash at end of cycle 10 (BEQ resolves in EX):
-  0x14 (in ID) and 0x18 (in IF) are flushed. PC redirected to 0x30.
-```
-
-**Detailed cycle accounting:**
-
-| Cycle | IF        | ID        | EX        | MEM       | WB        |
-|-------|-----------|-----------|-----------|-----------|-----------|
-| 1     | LW x1     | -         | -         | -         | -         |
-| 2     | ADD x2    | LW x1     | -         | -         | -         |
-| 3     | LW x3     | ADD x2    | LW x1 EX  | -         | -         |
-| 4     | LW x3(hold)| bubble   | LW x1 MEM | LW x1 MEM | -         |
-| 5     | MUL x4    | LW x3     | ADD x2 EX | LW x1 WB  | -         |
-| 6     | BEQ x4    | MUL x4    | LW x3 EX  | ADD x2 MEM| LW x1 WB  |
-| 7     | 0x14 ADD  | BEQ x4    | bubble    | LW x3 MEM | ADD x2 WB |
-| 8     | 0x18 SUB  | 0x14 ADD  | MUL x4 EX | bubble    | LW x3 WB  |
-
-H3 must be re-examined. LW x3 is at 0x08, MUL x4 is at 0x0C. Rechecking the cycle numbering:
-
-```
-Corrected pipeline diagram (numbered by instruction entry into IF):
-
-Cycle:  1    2    3    4    5    6    7    8    9   10   11   12   13
-LW x1: IF   ID   EX  MEM   WB
-ADD x2:     IF   ID  [st]   EX  MEM   WB
-                      ^-- stall (H1: LW followed immediately by ADD that reads x1)
-LW x3:          IF  [st]   ID   EX  MEM   WB
-                     ^-- stall (LW x3 frozen in IF while ADD x2 stalls in ID)
-MUL x4:              [--]   IF   ID  [st]  EX  MEM   WB
-                              ^-- MUL enters IF in cycle 5
-                                      ^-- stall (H3: LW x3 -> MUL x4)
-BEQ x4:                           IF  [st]  ID   EX  MEM  WB
-                                       ^-- BEQ also stalls while MUL stalls
-0x14:                                  IF  [st]  ID [sq]
-0x18:                                       [--] IF [sq]
-0x30 OR:                                              IF   ID   EX  MEM  WB
-                                               ^-- branch resolved in EX, cycle 11
-                                                   0x14 in ID squashed
-                                                   0x18 in IF squashed
-                                                   PC -> 0x30 in cycle 12
+Branch squash at end of cycle 9 (BEQ resolves in EX):
+  0x14 (in ID) and 0x18 (in IF) are flushed. PC redirected to 0x30, fetched in cycle 10.
 ```
 
 ### Part 4: CPI Calculation
@@ -145,7 +108,7 @@ Architecturally executed instructions (correct path): 6
 - 0x10 BEQ x4 (branch taken)
 - 0x30 OR x7
 
-The last instruction (0x30 OR x7) completes at cycle 13 + 4 = 17 (IF at cycle 12, WB at cycle 16... let's count precisely):
+The last instruction (0x30 OR x7) completes at cycle 14:
 
 ```
 Precise cycle count:
@@ -153,13 +116,12 @@ Precise cycle count:
   ADD x2: IF=2,  ID=3,  stall, EX=5,  MEM=6,  WB=7
   LW x3:  IF=3,  stall, ID=5,  EX=6,  MEM=7,  WB=8
   MUL x4: IF=5,  ID=6,  stall, EX=8,  MEM=9,  WB=10
-  BEQ x4: IF=6,  ID=7 (stall), ID=8, EX=9
+  BEQ x4: IF=6, held in IF in cycle 7, ID=8, EX=9
              (BEQ reads x4; MUL x4 is in EX in cycle 8, BEQ is in ID in cycle 8.
              EX/MEM forwarding covers BEQ's need: at cycle 9, EX/MEM contains MUL's
              result which is forwarded to BEQ in EX. No additional stall for BEQ.)
-             BEQ: IF=7, ID=8, EX=9. MUL: EX=8, MEM=9.
 
-  BEQ x4: IF=7, ID=8, EX=9 -> branch taken detected, MEM=10, WB=11
+  BEQ x4: EX=9 -> branch taken detected, MEM=10, WB=11
   0x14:   IF=8, ID=9 -> SQUASH at end of cycle 9 (BEQ resolves in EX cycle 9)
   0x18:   IF=9        -> SQUASH at end of cycle 9
   0x30:   IF=10, ID=11, EX=12, MEM=13, WB=14
@@ -206,7 +168,7 @@ MUL x4, x2,  x3       # x3 now one instruction later -> no stall
 BEQ x4, x12, 0x30
 ```
 
-Both load-use hazards would be eliminated by instruction reordering — a technique compilers perform at `-O1` and above (`-fschedule-insns`). This restructuring saves 2 cycles (reducing the CPI from 1.67 to 1.33 for this sequence).
+Both load-use hazards would be eliminated by instruction reordering — a technique compilers perform at `-O2` and above (`-fschedule-insns`). This restructuring saves 2 cycles (reducing the CPI from 1.67 to 1.33 for this sequence).
 
 ### MUL latency in real RISC-V implementations
 

@@ -105,12 +105,12 @@ Bit:    15..                ..0
 [12:10] = 000        → imm[5:3] = 000
 [9:7]   = 100        → rs1' = 100 = x12 (a2)
 [6]     = 1          → imm[2] = 1
-[5]     = 0          → imm[6] = 0  (for C.SD on RV64; for C.SW this is imm[2])
+[5]     = 0          → uimm[6] = 0
 ```
 
 For C.SW: the immediate encoding is `{imm[5:3], imm[2], imm[6]}` — but C.SW has a 5-bit unsigned offset (word-aligned):
 
-C.SW immediate: `uimm[5:3] = inst[12:10]`, `uimm[2] = inst[6]`, `uimm[6]` is not present for C.SW (C.SW max offset = 124 bytes). Let me use the correct C.SW encoding:
+C.SW immediate: `uimm[5:3] = inst[12:10]`, `uimm[2] = inst[6]`, `uimm[6] = inst[5]` (C.SW max offset = 124 bytes). Let me use the correct C.SW encoding:
 
 **C.SW encoding (CS format):**
 ```
@@ -118,7 +118,7 @@ C.SW immediate: `uimm[5:3] = inst[12:10]`, `uimm[2] = inst[6]`, `uimm[6]` is not
 [12:10] = uimm[5:3]
 [9:7]   = rs1'         base register
 [6]     = uimm[2]
-[5]     = uimm[6]      (only for C.SD; for C.SW this is also uimm[6] if present, but C.SW offset is 7 bits total: uimm[6:2])
+[5]     = uimm[6]      (C.SW offset is 7 bits total: uimm[6:2])
 ```
 
 Re-checking: C.SW uses a 5-bit offset scaled by 4 (covering 0-124 bytes):
@@ -175,7 +175,7 @@ This is the most common 16-bit instruction in typical code: every function retur
 
 This is a stack pointer adjustment: `sp = sp + (-48)`. On RISC-V, the frame size for typical functions is a multiple of 16 bytes (ABI alignment requirement for `sp`). The offset -48 is a multiple of 16, which matches **C.ADDI16SP**.
 
-**C.ADDI16SP** encodes `ADDI sp, sp, imm` where `imm` is a non-zero multiple of 16 in the range ±496.
+**C.ADDI16SP** encodes `ADDI sp, sp, imm` where `imm` is a non-zero multiple of 16 in the range −512 to +496.
 
 Format (CI variant, quadrant 1, `funct3 = 011`):
 ```

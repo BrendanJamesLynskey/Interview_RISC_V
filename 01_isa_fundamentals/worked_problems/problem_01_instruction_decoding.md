@@ -276,7 +276,7 @@ Step 5 — assembly:
 LW x6, -4(x9)
 ```
 
-Using ABI names: `lw a2, -4(s1)`
+Using ABI names: `lw t1, -4(s1)`
 
 This loads a 32-bit word from address `(x9 - 4)` into x6. A common pattern for reading the last element before the current pointer, or for loading a value from just below the stack pointer.
 
@@ -308,18 +308,6 @@ Step 1 — represent -20 as a 13-bit signed value:
   Add 1:              1_1111_1110_1100
   = -20
 
-  Bit layout of -20 (13-bit):
-    bit 12 = 1  (sign)
-    bit 11 = 1
-    bit 10 = 1
-    bit  9 = 1
-    bit  8 = 1
-    bit  7 = 1
-    bit  6 = 1
-    bit  5 = 1
-    bit  4 = 1
-    bit  3 = 0
-    bit  2 = 1
 20 = 16 + 4 = 0b0000_0001_0100
   bit 4 = 1 (16 = 2^4)
   bit 2 = 1 (4 = 2^2)

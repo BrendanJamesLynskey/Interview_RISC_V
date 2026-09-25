@@ -109,7 +109,7 @@ spike -d --isa=rv32i pk sum_test
 (spike) reg 0 a1    # verify a1 = 5
 (spike) reg 0 s0    # s0 = ? (not yet set at function entry)
 
-(spike) run 6       # execute 6 instructions (prologue: addi+4x sw + mv + mv + li + li)
+(spike) run 8       # execute 8 instructions (prologue: addi + 3x sw + mv + mv + li + li)
 
 (spike) reg 0 s0    # verify s0 = &arr[0]
 (spike) reg 0 s1    # verify s1 = 5
@@ -147,7 +147,7 @@ riscv32-unknown-elf-gdb -ex "target remote :1234" sum_test
 (gdb) info registers a0 a1
 # a0 = 0x<arr_addr>, a1 = 0x5
 
-(gdb) break *array_sum+24    # break at the lw instruction (offset depends on prologue size)
+(gdb) break *array_sum+36    # break at the lw instruction (9th 4-byte instruction; offset depends on prologue size)
                                # find exact offset: disassemble array_sum
 (gdb) disassemble array_sum  # view the compiled assembly
 
@@ -264,7 +264,7 @@ n=very large (potential integer overflow in sum):
 
 **The `j .loop` pseudo-instruction:**
 
-Note that `j .loop` is a pseudo-instruction that assembles to `jal x0, .loop`. It writes the return address to `x0` (discarding it) and jumps to `.loop`. If the loop offset exceeds 20 bits (2 MB), this instruction cannot reach the target — but for typical function sizes, this is never a problem.
+Note that `j .loop` is a pseudo-instruction that assembles to `jal x0, .loop`. It writes the return address to `x0` (discarding it) and jumps to `.loop`. If the loop offset exceeds the ±1 MiB JAL range (21-bit signed byte offset), this instruction cannot reach the target — but for typical function sizes, this is never a problem.
 
 ---
 

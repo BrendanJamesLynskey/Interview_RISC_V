@@ -162,7 +162,7 @@ system. The `satp` register holds `MODE=8` (Sv39) and `PPN=0x80400`. Describe th
 first step of the hardware page table walk: which physical address is the root page
 table located at, and which bits of the virtual address select the VPN[2] index?
 
-- A) Root page table at `0x8040_0000`; VPN[2] from VA bits [38:30] = `0x1FF` (511).
+- A) Root page table at `0x8040_0000`; VPN[2] from VA bits [38:30] = `0x1FE` (510).
 - B) Root page table at `0x8040_0000`; VPN[2] from VA bits [47:39] = `0x1FF` (511).
 - C) Root page table at `0x8040_0_000`; VPN[2] from VA bits [38:30] = `0x100` (256).
 - D) Root page table at `0x4020_0000`; VPN[2] from VA bits [38:30] = `0x1FF` (511).
@@ -314,8 +314,8 @@ through the full trap mechanism.
 
 The RISC-V privileged spec allows up to 64 PMP entries, numbered `pmp0cfg` through
 `pmp63cfg`, with corresponding `pmpaddr0` through `pmpaddr63`. Each entry covers one
-physical region. Implementations may provide any number from 0 to 64 in multiples of
-4 (since four entries are packed into each `pmpcfg` CSR).
+physical region. Implementations may implement 0, 16 or 64 entries (privileged spec v1.12 onward),
+with the lowest-numbered entries implemented first.
 
 - **A (8)** is a common minimum implementation but not the specification maximum.
 - **B (16)** is another common implementation size but still not the maximum.
@@ -431,15 +431,16 @@ For Sv39, the physical address of the root page table is `PPN << 12`. With `PPN 
 
 The virtual address `0xFFFF_FFFF_8000_0000` in Sv39 is a 39-bit sign-extended address.
 VPN[2] is extracted from VA bits [38:30]. For this address:
-- bits [38:30] of `0xFFFF_FFFF_8000_0000` = `1_1111_1111` = `0x1FF` = 511.
+- bits [38:30] of `0xFFFF_FFFF_8000_0000` = `1_1111_1110` = `0x1FE` = 510 (bit 31 is 1
+  but bit 30 is 0).
 
-The root page table entry at index 511 is read from physical address
-`0x8040_0000 + 511 * 8 = 0x8040_0FF8`.
+The root page table entry at index 510 is read from physical address
+`0x8040_0000 + 510 * 8 = 0x8040_0FF0`.
 
 - **B** is wrong: bits [47:39] are above the 39-bit virtual address width in Sv39;
   they must be sign extensions of bit 38 and are not part of the VPN.
 - **C** is wrong: `0x100` (256) would come from a different virtual address; the
-  calculation of VPN[2] from this specific address yields 511.
+  calculation of VPN[2] from this specific address yields 510.
 - **D** is wrong: the root page table physical address calculation `PPN << 12` with
   `PPN = 0x80400` gives `0x8040_0000`, not `0x4020_0000`.
 

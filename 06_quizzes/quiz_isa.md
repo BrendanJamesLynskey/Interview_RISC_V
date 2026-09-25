@@ -264,7 +264,7 @@ but that is a separate optional extension, not part of the base ISA.
 
 `x0` is hardwired to the constant zero. Any write to it is silently ignored, and any
 read always returns 0. This is a deliberate architectural choice: it eliminates the need
-for a separate "move" instruction (use `ADDI rd, x0, 0`) and allows `NOP` to be
+for a separate "move" instruction (use `ADDI rd, rs, 0`) and allows `NOP` to be
 encoded as `ADDI x0, x0, 0`.
 
 - **A** describes `x2` (sp), not `x0`.
@@ -341,8 +341,8 @@ callee-saved. A function that uses any of these registers must save and restore 
 
 - **A (a0-a7)** are argument/return value registers and are caller-saved.
 - **B (t0-t6)** are temporaries and are also caller-saved.
-- **D** is incomplete: `ra` and `sp` are indeed callee-saved but so are all the `s`
-  registers.
+- **D** is wrong: `sp` is callee-saved but `ra` is caller-saved in the psABI, and D
+  omits all the `s` registers.
 
 ---
 
@@ -391,8 +391,7 @@ Decoding `0x00A50513`:
 Result: `ADDI x10, x10, 10` (i.e., `a0 = a0 + 10`).
 
 - **B** would require opcode `0000011` (LOAD group), not `0010011`.
-- **C** has the wrong register description in the reasoning but arrives at the same answer
-  as A; however option C's description contains an internal inconsistency making it wrong.
+- **C** names rd = x11, but bits [11:7] = `01010` encode x10.
 - **D** would require funct3 = `010` for SLTI, not `000`.
 
 ---

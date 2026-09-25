@@ -12,7 +12,7 @@ You are implementing the secure boot stage for an RV32 embedded SoC. The physica
 
 ```
 0x0000_0000 - 0x0000_FFFF   Boot ROM (64 KiB): read-only, execute
-0x0001_0000 - 0x0001_FFFF   Reserved (16 KiB): no access permitted to any mode
+0x0001_0000 - 0x0001_FFFF   Reserved (64 KiB): no access permitted to any mode
 0x2000_0000 - 0x2000_0FFF   UART0 MMIO (4 KiB): R/W for kernel, no execute
 0x2000_1000 - 0x2000_1FFF   Timer MMIO (4 KiB): M-mode only, no S/U access
 0x8000_0000 - 0x8001_FFFF   Secure firmware (128 KiB): M-mode only, locked
@@ -50,15 +50,15 @@ pmpaddr = (0x0000_0000 >> 2) | (2^(16-3) - 1)
         = 0x1FFF
 ```
 
-**Region 2: Reserved `[0x0001_0000, 0x0002_0000)` — 16 KiB**
+**Region 2: Reserved `[0x0001_0000, 0x0002_0000)` — 64 KiB**
 ```
-Size = 16 KiB = 2^14 bytes. Base = 0x0001_0000 (naturally aligned to 2^14).
+Size = 64 KiB = 2^16 bytes. Base = 0x0001_0000 (naturally aligned to 2^16).
 => NAPOT
 
-pmpaddr = (0x0001_0000 >> 2) | (2^(14-3) - 1)
-        = 0x4000 | (2048 - 1)
-        = 0x4000 | 0x7FF
-        = 0x47FF
+pmpaddr = (0x0001_0000 >> 2) | (2^(16-3) - 1)
+        = 0x4000 | (8192 - 1)
+        = 0x4000 | 0x1FFF
+        = 0x5FFF
 ```
 
 **Region 3: UART0 MMIO `[0x2000_0000, 0x2000_1000)` — 4 KiB**
@@ -167,8 +167,8 @@ pmp_init:
     li    t0, 0x00001FFF
     csrw  pmpaddr0, t0
 
-    # Entry 1: Reserved NAPOT (16 KiB at 0x0001_0000)
-    li    t0, 0x000047FF
+    # Entry 1: Reserved NAPOT (64 KiB at 0x0001_0000)
+    li    t0, 0x00005FFF
     csrw  pmpaddr1, t0
 
     # Entry 2: UART0 NAPOT (4 KiB at 0x2000_0000)
@@ -285,7 +285,7 @@ R=0 => read not permitted.
 ```
 Fault type:  Load access fault (physical address blocked by PMP)
 scause:      5  (load access fault — if medeleg[5]=1, else mcause=5 in M-mode)
-stval:       0x8001_0000  (faulting physical address)
+stval:       0x8001_0000  (faulting virtual address; equal to the physical address here, with no translation)
 sepc:        PC of the load instruction
 ```
 
@@ -319,7 +319,8 @@ pmpaddr8 = (0x20002100 >> 2) | (2^(8-3) - 1)
 pmpcfg byte for entry 8: L=0, A=NAPOT, R=1, W=1, X=0 = `0x1B`
 
 ```asm
-# Dynamic addition at runtime (S-mode or M-mode, depending on who manages PMP)
+# Dynamic addition at runtime (M-mode only: the PMP CSRs are not accessible from S-mode,
+# so the kernel must ask the firmware to do this, e.g. through an SBI call)
 # Note: pmpcfg2 covers entries 8-11 on RV32
 
 li    t0, 0x0800085F

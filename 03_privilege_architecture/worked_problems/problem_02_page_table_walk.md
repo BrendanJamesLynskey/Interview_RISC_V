@@ -116,27 +116,19 @@ This is a high (kernel) virtual address — negative in signed representation. K
 VA = 0xFFFF_FFC0_0000_0000
 
 VPN[2] = va[38:30] = (VA >> 30) & 0x1FF
-  0xFFFF_FFC0_0000_0000 >> 30 = 0x3FFFFFFFC00 >> 0 ... let's compute:
-  VA >> 30 = 0xFFFF_FFC0_0000_0000 / 0x4000_0000
-           = 0x3FFFF_FF00 (approximately)
-  More precisely: shift right 30:
-  0xFFFF_FFC0_0000_0000 >> 30 = 0xFFFF_FFF0_0000 (64-bit)
-  Masking low 9 bits: & 0x1FF = 0x1FF = 511
+  0xFFFF_FFC0_0000_0000 >> 30 = 0x3_FFFF_FF00
+  Masking low 9 bits: 0x3_FFFF_FF00 & 0x1FF = 0x100 = 256
+  (bit 38 = 1 and bits [37:30] = 0, so VPN[2] = 1_0000_0000b)
 
-VPN[1] = va[29:21] = (VA >> 21) & 0x1FF
-  VA >> 21 = 0x7FFFF_FE000 (approximately)
-  Lower 9 bits = 0x000 = 0
-
-VPN[0] = va[20:12] = (VA >> 12) & 0x1FF
-  VA >> 12 = 0xFFFF_FFC0_0000
-  Lower 9 bits = 0x000 = 0
+VPN[1] = va[29:21] = (VA >> 21) & 0x1FF = 0
+VPN[0] = va[20:12] = (VA >> 12) & 0x1FF = 0
 
 offset = VA & 0xFFF = 0x000
 ```
 
 Summary:
 ```
-VPN[2] = 511 = 0x1FF
+VPN[2] = 256 = 0x100
 VPN[1] = 0
 VPN[0] = 0
 offset = 0x000
@@ -146,43 +138,20 @@ offset = 0x000
 
 ```
 PTE address = root_PT + VPN[2] * 8
-            = 0x8000_1000 + 511 * 8
-            = 0x8000_1000 + 0xFF8
-            = 0x8000_1FF8
+            = 0x8000_1000 + 256 * 8
+            = 0x8000_1000 + 0x800
+            = 0x8000_1800
 
-PTE value at 0x8000_1FF8 = 0x0000_0000_2000_4001
-
-Decode PTE:
-  V = bit 0 = 1 (valid)
-  R = bit 1 = 0
-  W = bit 2 = 0
-  X = bit 3 = 0
-  => R=W=X=0: this is a POINTER PTE (points to next-level PT)
-
-  PPN = PTE[53:10] = 0x0000_0000_2000_4001 >> 10
-      = 0x0000_0000_0008_0010
-  PPN = 0x80010 (after masking to 44 bits)
-```
-
-**Step 3: Level-1 walk**
-
-```
-Level-1 PT physical address = PPN * 4096 = 0x80010 * 0x1000 = 0x8001_0000
-
-PTE address = 0x8001_0000 + VPN[1] * 8
-            = 0x8001_0000 + 0 * 8
-            = 0x8001_0000
-
-PTE value at 0x8001_0000 = 0x0000_0000_0000_0000
+PTE value at 0x8000_1800 = 0x0000_0000_0000_0000   (only offsets 0x000 and 0xFF8 are non-zero)
 
 V = bit 0 = 0 (INVALID!)
-=> PAGE FAULT
+=> PAGE FAULT at the root level
 ```
 
-Re-examining: the entry at offset 0xFF8 is the last entry (index 511), not offset 0. Offset 0 is zero.
+The root entry at offset 0xFF8 (index 511) is not the one used: it would be selected by VPN[2] = 511, i.e. a VA with bits [38:30] all ones such as `0xFFFF_FFFF_C000_0000`.
 
 ```
-PTE at 0x8001_0000 (offset 0, index 0) = 0x0000_0000_0000_0000
+PTE at 0x8000_1800 (index 256) = 0x0000_0000_0000_0000
 V = 0 => INVALID PTE => instruction/load/store PAGE FAULT
 
 scause = 12 (instruction page fault) or 13 (load) or 15 (store)
@@ -190,7 +159,7 @@ scause = 12 (instruction page fault) or 13 (load) or 15 (store)
 stval  = 0xFFFF_FFC0_0000_0000 (faulting virtual address)
 ```
 
-This virtual address is NOT mapped — Linux would need to handle this as a kernel page fault, which typically indicates a kernel bug (NULL pointer dereference in kernel context) and results in a kernel oops.
+This virtual address is NOT mapped — Linux would need to handle this as a kernel page fault, which typically indicates a kernel bug and results in a kernel oops.
 
 ### Part C: Walk for VA `0x0000_0000_0000_1008`
 
@@ -255,28 +224,28 @@ Decode:
   R = bit 1 = 1
   W = bit 2 = 1
   X = bit 3 = 0
-  U = bit 4 = 1 (user accessible)
+  U = bit 4 = 0 (NOT user accessible: 0xC7 = 1100_0111b)
   G = bit 5 = 0
   A = bit 6 = 1
   D = bit 7 = 1
-  => R=1, W=1, X=0: read-write user page (no execute)
+  => R=1, W=1, X=0: read-write supervisor page (no execute)
   => LEAF PTE
 
-  PPN = 0x0000_0000_2005_10C7 >> 10 = 0x80014
-  (0x2005_10C7 >> 10 = 0x80014 after masking)
+  PPN = 0x0000_0000_2005_10C7 >> 10 = 0x80144
+  (0x2005_10C7 >> 10 = 0x80144)
 ```
 
 **Step 5: Compute physical address**
 
 ```
 PA = PPN * 4096 + offset
-   = 0x80014 * 0x1000 + 0x008
-   = 0x8001_4000 + 0x008
-   = 0x8001_4008
+   = 0x80144 * 0x1000 + 0x008
+   = 0x8014_4000 + 0x008
+   = 0x8014_4008
 ```
 
-Virtual address `0x0000_0000_0000_1008` maps to physical address **`0x8001_4008`**.  
-Permissions: R=1, W=1, X=0, U=1 (user read/write, no execute).
+Virtual address `0x0000_0000_0000_1008` maps to physical address **`0x8014_4008`**.  
+Permissions: R=1, W=1, X=0, U=0 (supervisor read/write, no execute; a U-mode access would fault).
 
 ### Part D: Walk for VA `0x0000_0000_0000_3FF8`
 
@@ -329,29 +298,23 @@ Level-0 PTE at `0x8004_0000 + 0 * 8 = 0x8004_0000`:
 ```
 PTE value = 0x0000_0000_2005_00C7
 
-V = 1, R = 1, W = 1, X = 0, U = 1, G = 0, A = 1, D = 1
-Leaf PTE: read/write/no-execute, user-accessible
+V = 1, R = 1, W = 1, X = 0, U = 0, G = 0, A = 1, D = 1   (0xC7 = 1100_0111b)
+Leaf PTE: read/write/no-execute, supervisor-only
 ```
 
 Permission check for U-mode store:
 ```
-W = 1  => write permitted
-U = 1  => user-mode access permitted (U=0 would require S-mode or SUM=1)
-D = 1  => dirty bit already set (no fault-and-update needed)
-A = 1  => accessed bit set (same)
+W = 1  => write permitted by the R/W/X bits
+U = 0  => page is NOT accessible from U-mode (SUM only affects S-mode access to U=1 pages)
 ```
 
-Result: Store is **permitted**.
-
-Physical address: PPN = `0x80014` => PA = `0x8001_4000 + 0x008` = `0x8001_4008`.
-
-VPN[0]=0 maps to PTE at offset 0, PPN = 0x80014 (from the first PTE `0x2005_00C7`):
+Result: Store is **not permitted** — a store/AMO page fault is raised:
 ```
-0x2005_00C7 >> 10 = 0x80014
-PA = 0x80014 * 0x1000 + 0x008 = 0x8001_4008
+scause = 15 (store/AMO page fault)
+stval  = 0x0000_0000_0000_0008 (faulting virtual address)
 ```
 
-The store succeeds. Physical memory at `0x8001_4008` is written.
+For reference, the translation that an S-mode store would use: PPN = `0x2005_00C7 >> 10` = `0x80140`, so PA = `0x80140 * 0x1000 + 0x008` = `0x8014_0008`.
 
 ---
 
@@ -371,7 +334,7 @@ Bit  Field  Extract as
 5    G      (pte >> 5) & 1
 6    A      (pte >> 6) & 1
 7    D      (pte >> 7) & 1
-53:10 PPN   (pte >> 10) & 0x3FFF_FFFF_FFFF
+53:10 PPN   (pte >> 10) & 0xFFF_FFFF_FFFF
 ```
 
 Leaf vs pointer:
@@ -397,7 +360,7 @@ W=1, R=0          =>  RESERVED, raises page fault
 
 | VA | VPN[2] | VPN[1] | VPN[0] | Result |
 |---|---|---|---|---|
-| `0xFFFF_FFC0_0000_0000` | 511 | 0 | 0 | Page fault (level-1 PTE invalid) |
-| `0x0000_0000_0000_1008` | 0 | 0 | 1 | PA `0x8001_4008`, R/W/U |
+| `0xFFFF_FFC0_0000_0000` | 256 | 0 | 0 | Page fault (root PTE invalid) |
+| `0x0000_0000_0000_1008` | 0 | 0 | 1 | PA `0x8014_4008`, R/W, U=0 (supervisor page) |
 | `0x0000_0000_0000_3FF8` | 0 | 0 | 3 | Page fault (level-0 PTE invalid) |
-| `0x0000_0000_0000_0008` | 0 | 0 | 0 | PA `0x8001_4008`, R/W/U, store OK |
+| `0x0000_0000_0000_0008` | 0 | 0 | 0 | U-mode store: page fault (U=0); S-mode PA would be `0x8014_0008` |

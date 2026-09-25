@@ -552,8 +552,8 @@ I4 OR:                 IF   IF   ID   EX   MEM  WB <- stalled one cycle with I2
 
 Explanation:
 - I2 needs x1 from I1's load. The stall unit detects load-use and inserts 1 bubble
-  after I2's ID stage. After the stall, x1 is forwarded from EX/MEM (I1 is now in WB,
-  result in MEM/WB, which forwards to I2's EX).
+  after I2's ID stage. After the stall, x1 is forwarded from MEM/WB (I1 is now in WB,
+  and its load result in MEM/WB forwards to I2's EX).
 - I3 needs x3 from I2. When I3 reaches EX, I2 is in MEM — forwarding from EX/MEM, no
   stall.
 - I4 needs x5 from I3. When I4 reaches EX, I3 is in MEM — forwarding from EX/MEM, no

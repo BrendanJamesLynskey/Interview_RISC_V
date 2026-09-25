@@ -455,7 +455,7 @@ Offset to skip: `0xA014 - 0x8010 = 0x2004 = 8196 bytes`.
 skip_near:
 0x8018:  ...  (the 8 KB true block starts here)
 ...
-0xA014:  ...  (skip label, where execution resumes after the if)
+0xA018:  ...  (skip label, where execution resumes after the if)
 ```
 
 Note: `skip_near` is not `skip`. The condition is inverted:
@@ -465,8 +465,8 @@ Note: `skip_near` is not `skip`. The condition is inverted:
 
 Check JAL range:
 ```
-offset = 0xA014 - 0x8014 = 0x2000 = 8192 bytes
-8192 < 1,048,574 (J-type max): JAL is sufficient
+offset = 0xA018 - 0x8014 = 0x2004 = 8196 bytes
+8196 < 1,048,574 (J-type max): JAL is sufficient
 ```
 
 **Encoding of the BNE (at 0x8010):**
@@ -491,52 +491,51 @@ Binary: 0000000_01011_01010_001_01000_1100011
 
 **Encoding of the JAL (at 0x8014):**
 
-`JAL x0, skip` where skip = `0xA014`:
+`JAL x0, skip` where skip = `0xA018` (the inserted JAL moves the 8 KB block down by 4 bytes, so it now occupies 0x8018–0xA017):
 ```
-offset = 0xA014 - 0x8014 = 0x2000 = 8192
+offset = 0xA018 - 0x8014 = 0x2004 = 8196
 
-8192 = 0x2000 = 0b0010_0000_0000_0000
+8196 = 0x2004 = 0b0010_0000_0000_0100
   bit 13 = 1 (8192 = 2^13)
+  bit 2  = 1 (4 = 2^2)
   others = 0
-
-8192 = 0x2000, so bit 13 of the offset = 1, all others 0.
 
 imm[20]   = bit20 = 0
 imm[19:12]= bits 19 down to 12 = {bit19, bit18, ..., bit13, bit12}
            = {0, 0, 0, 0, 0, 0, 1, 0}
            = 00000010
 imm[11]   = bit11 = 0
-  imm[10:1] = bits 10:1 = 0000000000
+imm[10:1] = bits 10:1 = 0000000010  (bit2 = 1)
 
 inst[31]   = imm[20]   = 0
-inst[30:21]= imm[10:1] = 0000000000
+inst[30:21]= imm[10:1] = 0000000010
 inst[20]   = imm[11]   = 0
-inst[19:12]= imm[19:12]= 00100000
+inst[19:12]= imm[19:12]= 00000010
 inst[11:7] = rd = x0   = 00000
 inst[6:0]  = opcode    = 1101111
 
 Binary:
 bit 31:    0
-bits 30:21: 0000000000
+bits 30:21: 0000000010
 bit 20:    0
-bits 19:12: 00100000
+bits 19:12: 00000010
 bits 11:7:  00000
 bits 6:0:   1101111
 
-= 0000 0000 0000 0010 0000 0000 0110 1111
-= 0x0020006F
+= 0000 0000 0100 0000 0010 0000 0110 1111
+= 0x0040206F
 ```
 
 **Complete emitted sequence:**
 ```assembly
 0x8010:  0x00B51463    # BNE a0, a1, +8  (skip_near at 0x8018)
-0x8014:  0x0020006F    # JAL x0, +8192   (jump to skip at 0xA014)
+0x8014:  0x0040206F    # JAL x0, +8196   (jump to skip at 0xA018)
 0x8018:  ...           # start of 8 KB true block
 ...
-0xA014:  ...           # skip (if-join point)
+0xA018:  ...           # skip (if-join point)
 ```
 
-**This uses only 2 instructions total on the branch critical path** (1 BNE + 1 JAL), which is optimal. The BNE is taken in the common case (a0 != a1, skip the true block), so execution jumps directly from 0x8010 to 0x8018 — the JAL at 0x8014 is only reached when a0 == a1 (the branch-to-skip case).
+**This uses only 2 instructions total on the branch critical path** (1 BNE + 1 JAL), which is optimal. The BNE is taken when a0 != a1 (run the true block), so execution jumps directly from 0x8010 to 0x8018 — the JAL at 0x8014 is only reached when a0 == a1 (the branch-to-skip case).
 
 ---
 

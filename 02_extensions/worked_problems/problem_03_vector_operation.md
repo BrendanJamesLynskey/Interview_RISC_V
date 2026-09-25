@@ -44,7 +44,7 @@ uint32_t dot_u8(const uint8_t *a, const uint8_t *b, int n);
 ```
 
 Constraints:
-- Overflow: the sum of products must not wrap. Assume `n <= 65535` and element values are in `[0, 255]`, so the maximum exact result is `255 * 255 * 65535 = 4,278,190,725`, which exceeds a 32-bit unsigned range (4,294,967,295). Use 64-bit accumulation internally and truncate to 32 bits at the end (document this).
+- Overflow: the sum of products must not wrap. Assume `n <= 65535` and element values are in `[0, 255]`, so the maximum exact result is `255 * 255 * 65535 = 4,261,413,375`, which fits (just) within the 32-bit unsigned range (4,294,967,295). Show that 32-bit accumulation is therefore exact (document this).
 - Use widening multiply-add to avoid multiple precision steps per iteration.
 
 ---
@@ -158,7 +158,7 @@ slli  a4, a4, 16
 srai  a4, a4, 16    # sign-extend hi from bits 15:0
 ```
 
-The `.vx` instruction uses the full XLEN-wide value of the scalar register. For `SEW=16` operations, the scalar is sign-extended from the low 16 bits of the register, but it is cleaner to pre-extend to avoid microarchitectural surprises on some implementations.
+When XLEN > SEW, a `.vx` instruction uses only the least-significant SEW bits of the scalar register, so for `SEW=16` the pre-extension is not strictly required; it is harmless and makes the register value match the C `int16_t` argument.
 
 ---
 
@@ -203,18 +203,12 @@ dot_u8:
     # Widen 16-bit products to 32-bit and add to accumulator
     # vwaddu.wv widens vs2 (16-bit) to 32-bit and adds to vd (already 32-bit)
     # Note: vd must be m4, vs2 must be m2 (half the LMUL)
-    vsetvli  t0, a2, e16, m2, ta, ma   # reconfigure for 16-bit
+    vsetvli  t0, a2, e16, m2, tu, ma   # reconfigure for 16-bit; tu keeps accumulator tail
     vwaddu.wv v8, v8, v4        # v8 (e32,m4) += zero_extend(v4 (e16,m2))
 
-    # Note: t0 from last vsetvli reflects SEW=16, m2 -- vl is half of SEW=8 vl
-    # We need to track elements processed based on original 8-bit load vl
-    # Better approach: save t0 from the SEW=8 vsetvli
+    # Note: e16,m2 has the same VLMAX (32) as e8,m1, so t0 equals the e8 vl
 
-    # Restore state for pointer advancement
-    # (elements processed = t0 from e8,m1 vsetvli = original 8-bit vl)
-    # ... this gets complex; cleaner to save the e8 vl:
-
-    sub      a2, a2, t0        # remaining (t0 from e16,m2 might differ - see note below)
+    sub      a2, a2, t0        # remaining elements -= vl
     add      a0, a0, t0        # advance by bytes = vl (SEW=8, vl = bytes)
     add      a1, a1, t0        # advance b pointer
     bnez     a2, .loop
@@ -234,55 +228,13 @@ dot_u8:
 
 **Clarification on the vsetvli switching:**
 
-Switching `vsetvli` inside the loop for the widening accumulation requires careful tracking of the element count. A cleaner implementation avoids in-loop `vsetvli` switching by using a single precision throughout. Here is the clean version using `vwmaccu.vv` (widening multiply-accumulate into 32-bit from 8-bit inputs, if available) or a two-stage approach:
+The in-loop `vsetvli` switch is safe here: with `VLEN = 256`, `e8,m1` and `e16,m2` both have `VLMAX = 32`, so both calls return the same `vl` and the pointer/count updates are correct. The accumulator update uses `tu` (tail-undisturbed) so that, on the final short iteration, lanes beyond `vl` keep their partial sums instead of being overwritten by a tail-agnostic policy before the full-width reduction.
 
-```asm
-# Clean version using widening: accumulate into 32-bit per-lane sums
-dot_u8_clean:
-    beqz    a2, .zero
-
-    # Configure for 8-bit loads, LMUL=1
-    # With VLEN=256, SEW=8, LMUL=1: VLMAX=32
-    # Accumulator at SEW=32, LMUL=4: 32 lanes of 32 bits
-    vsetvli  t1, zero, e32, m4, ta, ma
-    vmv.v.i  v8, 0             # zero 32-bit accumulator (v8..v11)
-
-.loop:
-    vsetvli  t0, a2, e8, m1, ta, ma    # vl elements for 8-bit processing
-
-    vle8.v   v0, (a0)                   # a[0..vl-1]
-    vle8.v   v2, (a1)                   # b[0..vl-1]
-
-    # vwmaccu.vv: vd (e2*SEW) += zext(vs1) * zext(vs2)
-    # vd must be m4 (2x LMUL of source m1), but uses the same vl
-    # This instruction requires: vd.SEW = 2 * vs.SEW, vd.LMUL = 2 * vs.LMUL
-    vwmaccu.vv  v8, v0, v2             # v8 (e16,m2) += zero_ext(v0) * zero_ext(v2)
-
-    # Problem: v8 is e16, m2 after this, but we need e32 accumulation.
-    # Correct approach: use a two-step widening
-
-    sub      a2, a2, t0
-    add      a0, a0, t0         # advance by t0 bytes (SEW=8, so vl = bytes)
-    add      a1, a1, t0
-    bnez     a2, .loop
-
-.reduce:
-    # Convert 16-bit partial sums to 32-bit and reduce
-    vsetvli  zero, zero, e16, m2, ta, ma
-    vsetvli  t0, zero, e32, m4, ta, ma
-    # ... (final horizontal sum as above)
-    vmv.v.i  v0, 0
-    vredsum.vs  v0, v8, v0
-    vmv.x.s  a0, v0
-    ret
-.zero:
-    li    a0, 0
-    ret
-```
+`vwmaccu.vv` is not a drop-in replacement: it widens only once (8-bit × 8-bit into a 16-bit accumulator), so it cannot accumulate directly into 32-bit lanes from 8-bit inputs. The two-step `vwmulu.vv` + `vwaddu.wv` sequence above is the correct approach for 32-bit accumulation.
 
 **Overflow note (as required by problem statement):**
 
-The maximum dot product value is `255 * 255 * 65535 = 4,278,190,725`, which exceeds `UINT32_MAX = 4,294,967,295`? Actually: `255 * 255 = 65025`, and `65025 * 65535 = 4,260,894,375` which is less than `UINT32_MAX (4,294,967,295)`. So in fact, for the given constraints (`n <= 65535`, values `[0, 255]`), the result fits in a `uint32_t`. The `vredsum.vs` into a 32-bit accumulator is exact.
+The maximum dot product value is `255 * 255 * 65535`: `255 * 255 = 65025`, and `65025 * 65535 = 4,261,413,375`, which is less than `UINT32_MAX (4,294,967,295)`. So in fact, for the given constraints (`n <= 65535`, values `[0, 255]`), the result fits in a `uint32_t`. The `vredsum.vs` into a 32-bit accumulator is exact.
 
 However, the per-lane 32-bit accumulators accumulate at most `ceil(n / VLMAX) * 255 * 255` per lane. With `VLMAX = 32` and `n = 65535`: `ceil(65535/32) = 2048` iterations per lane, `2048 * 65025 = 133,171,200` per lane — well within `uint32_t`. Safe.
 
@@ -327,24 +279,24 @@ Total latency chain: 3 + 1 + 1 + 3 = 8 cycles
 Additionally, the loop overhead:
 - `sub` (1 cy), `slli` (1 cy), `add` (1 cy), `add` (1 cy), `bnez` (1 cy) = 5 cycles
 
-The throughput bound: if all instructions issue at 1 per cycle, 4 vector instructions + 5 scalar instructions = 9 instructions per loop. If issue width is 1 instruction/cycle, throughput bound = 9 cycles.
+The throughput bound: if all instructions issue at 1 per cycle, 1 `vsetvli` + 4 vector instructions + 5 scalar instructions = 10 instructions per loop. If issue width is 1 instruction/cycle, throughput bound = 10 cycles.
 
 **Bottleneck determination:**
 
 - Latency bound: **8 cycles** (critical path through vector instructions).
-- Throughput bound: 9 cycles (instruction count, single-issue assumed).
+- Throughput bound: 10 cycles (instruction count, single-issue assumed).
 
-The loop is **throughput-bound** at 9 cycles per iteration on a single-issue in-order machine. The latency chain (8 cycles) is shorter than the instruction count bound (9 cycles), so the processor cannot hide the latency — it will issue the next `vle32.v` before the previous chain completes, but only if it has out-of-order capability. On an in-order machine, each `vle32.v` must wait for the previous `vse32.v` to complete (there is a structural dependency through the loop).
+The loop is **throughput-bound** at 10 cycles per iteration on a single-issue in-order machine. The latency chain (8 cycles) is shorter than the instruction count bound (10 cycles), so the processor cannot hide the latency — it will issue the next `vle32.v` before the previous chain completes, but only if it has out-of-order capability. On an in-order machine, each `vle32.v` must wait for the previous `vse32.v` to complete (there is a structural dependency through the loop).
 
 **In-order machine (typical for embedded V implementations):**
 
 On an in-order core, the next loop iteration's `vle32.v` can overlap with the current iteration's `sub`/`slli`/`add`/`bnez` if the load has no dependency on those instructions. Since `vle32.v` in iteration N+1 is independent of the `vse32.v` in iteration N (different addresses), on a machine with a non-blocking vector memory unit, loads from iteration N+1 could begin during the stores of iteration N. Assuming no structural hazard:
 
-Effective cycles per iteration ≈ max(latency of critical path, throughput_instruction_count) ≈ 8-9 cycles.
+Effective cycles per iteration ≈ max(latency of critical path, throughput_instruction_count) ≈ 8-10 cycles.
 
-**At VLMAX=8 elements per iteration and 8-9 cycles per iteration:**
+**At VLMAX=8 elements per iteration and 8-10 cycles per iteration:**
 
-Throughput ≈ `8 / 9` ≈ 0.89 elements per cycle, or about 1 cycle per element. A scalar implementation would take at least 3-4 instructions per element (load, negate, max, store), so the vector implementation provides roughly 4x throughput improvement.
+Throughput ≈ `8 / 10` = 0.8 elements per cycle, or about 1.25 cycles per element. A scalar implementation would take at least 3-4 instructions per element (load, negate, max, store), so the vector implementation provides roughly a 2.4-3.2x throughput improvement.
 
 ---
 
@@ -358,6 +310,6 @@ Throughput ≈ `8 / 9` ≈ 0.89 elements per cycle, or about 1 cycle per element
 
 **Widening operations require matching LMUL pairs.** The rule: if widening multiply takes `SEW`-wide inputs with `LMUL=m`, the output is `2*SEW`-wide with `LMUL=2m`. Planning the register layout before coding — deciding which groups hold inputs at what width — prevents register conflicts. The `vtype` must be explicitly reconfigured when switching between element widths.
 
-**Horizontal reduction is a separate phase.** Vector computation naturally produces per-lane results. Reducing to a scalar (dot product final sum, array maximum, etc.) uses `vredsum.vs`, `vredmax.vs`, etc. These are post-loop operations on the accumulated per-lane results. The `vfredusum.vs` (ordered) vs. `vfredosum.vs` (unordered) distinction matters for reproducibility — unordered reduction has higher throughput but may give different floating-point results on different `VLEN` hardware.
+**Horizontal reduction is a separate phase.** Vector computation naturally produces per-lane results. Reducing to a scalar (dot product final sum, array maximum, etc.) uses `vredsum.vs`, `vredmax.vs`, etc. These are post-loop operations on the accumulated per-lane results. The `vfredosum.vs` (ordered) vs. `vfredusum.vs` (unordered) distinction matters for reproducibility — unordered reduction has higher throughput but may give different floating-point results on different `VLEN` hardware.
 
 **Performance analysis requires identifying the critical path.** For vector code, the critical path is typically memory latency (load → first dependent operation) rather than arithmetic latency. Scheduling instructions to hide load latency — issuing the load before the data is needed — is the primary optimisation technique for memory-bound vector kernels.

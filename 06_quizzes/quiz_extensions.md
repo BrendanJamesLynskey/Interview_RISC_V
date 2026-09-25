@@ -129,8 +129,8 @@ the key architectural difference between them in terms of register storage?
 
 ### Q10 (Intermediate)
 
-The B extension is ratified in three sub-groups. Which of the following is NOT one
-of those sub-groups?
+The ratified bit-manipulation extensions are split into several Z sub-extensions.
+Which of the following is NOT one of them?
 
 - A) Zba (address generation)
 - B) Zbb (basic bit manipulation)
@@ -361,10 +361,11 @@ bits are all-ones; if not, the value is treated as a canonical NaN.
 
 ### Q10 - Answer: D (Zbd does not exist)
 
-The ratified B extension sub-groups are: Zba (address generation: `SH1ADD`, `SH2ADD`,
+The ratified bit-manipulation sub-extensions (v1.0.0) are: Zba (address generation: `SH1ADD`, `SH2ADD`,
 `SH3ADD`, `ADD.UW`), Zbb (basic bit manipulation: `CLZ`, `CTZ`, `CPOP`, `ANDN`,
-`ORN`, `XNOR`, rotates, byte reversal, sign extension), and Zbc (carry-less multiply:
-`CLMUL`, `CLMULH`, `CLMULR`). There is no "Zbd" sub-group.
+`ORN`, `XNOR`, rotates, byte reversal, sign extension), Zbc (carry-less multiply:
+`CLMUL`, `CLMULH`, `CLMULR`) and Zbs (single-bit operations). The single-letter B
+extension is defined as Zba + Zbb + Zbs. There is no "Zbd" sub-group.
 
 ---
 
@@ -387,7 +388,7 @@ behaviour of every vector instruction.
 The RISC-V spec explicitly defines the overflow case for signed division: when the
 dividend is INT32_MIN (`0x80000000`) and the divisor is -1, the mathematical result
 (INT32_MAX + 1) overflows 32 bits. The spec mandates that the result is the dividend
-itself (INT32_MIN = `0x80000000`), matching the behaviour of x86 and most hardware.
+itself (INT32_MIN = `0x80000000`), with no trap (x86 `IDIV`, by contrast, raises a divide-error exception).
 The remainder is defined as 0 in this case.
 
 - **A** is wrong: the spec does not saturate to INT32_MAX; it returns the dividend.

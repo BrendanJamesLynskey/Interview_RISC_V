@@ -293,4 +293,4 @@ li    t1, 0x00000222
 bne   t0, t1, delegation_config_error
 ```
 
-If a platform does not implement `medeleg` (M-mode only system), writing to it is silently ignored, and all traps go to M-mode — which is correct for a no-OS bare-metal system.
+If a platform does not implement S-mode (e.g. an M-mode-only system), `medeleg` and `mideleg` do not exist and accessing them raises an illegal-instruction exception, so this code must only run on platforms with S-mode. On such a system all traps go to M-mode anyway — which is correct for a no-OS bare-metal system.

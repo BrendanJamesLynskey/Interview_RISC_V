@@ -110,7 +110,7 @@ push_correct:
     ret
 ```
 
-The extra `sw` inside the LR/SC is necessary to use the value read by the `LR` (which is the canonical atomic value). This remains within the constrained LR/SC sequence (fewer than 16 instructions, no backward branches within).
+The extra `sw` inside the LR/SC is necessary to use the value read by the `LR` (which is the canonical atomic value). Note that this store still makes the sequence *unconstrained*: the spec excludes all loads and stores between the LR and SC, so eventual success is not architecturally guaranteed, although the loop is correct and usually succeeds in practice because the store is to the private node.
 
 ---
 
@@ -141,7 +141,7 @@ pop:
 
 The LR/SC combination tracks whether `s->top` was written by any hart since the `LR`. Even if another hart pops a node and pushes back a node with the same address (ABA), the `SC` will fail — any write to `s->top` since the `LR` invalidates the reservation, regardless of whether the written value is the same as what was read.
 
-**The `lw t1, 4(t0)` inside the LR/SC pair:** this load is to `top->next`, a different address from the reservation (`s->top`). The spec permits this within a constrained LR/SC pair. If the `SC` fails, we retry and reload `t0` with a fresh `LR`, then load `top->next` again from the (potentially different) node.
+**The `lw t1, 4(t0)` inside the LR/SC pair:** this load is to `top->next`, a different address from the reservation (`s->top`). It is permitted, but it makes the LR/SC sequence unconstrained (the spec excludes loads and stores between LR and SC), so forward progress is not architecturally guaranteed. If the `SC` fails, we retry and reload `t0` with a fresh `LR`, then load `top->next` again from the (potentially different) node.
 
 **Potential hazard: use-after-free.** If another hart pops `t0` from the stack and frees the node between our `LW t1, 4(t0)` and the `SC`, we will read from freed memory. This is a fundamental hazard of lock-free lists in environments with manual memory management. Solutions include hazard pointers, epoch-based reclamation, or a node pool that never frees nodes to the OS allocator.
 

@@ -59,13 +59,13 @@ Encoding fields:
 
 Full encoding with all variable fields zero (rd=x0, rs1=x0, rs2=x0):
   MATCH_BSATS = 0b 0001000 00000 00000 011 00000 0001011
-              = 0x1000_180B
+              = 0x1000_300B
 
 MASK_BSATS  = 0b 1111111 00000 00000 111 00000 1111111
             = 0xFE00_707F
 
 Verification: applying MASK to an instruction and comparing to MATCH:
-  If (instruction & 0xFE00_707F) == 0x1000_180B: this is a BSATS instruction.
+  If (instruction & 0xFE00_707F) == 0x1000_300B: this is a BSATS instruction.
 
 Concrete example: BSATS a0, a1, a2
   rd  = a0 = x10 = 5'b01010
@@ -75,7 +75,7 @@ Concrete example: BSATS a0, a1, a2
   Encoded: 0b 0001000 01100 01011 011 01010 0001011
            = 0x10C5_B50B
 
-Let's verify: 0x10C5_B50B & 0xFE00_707F = 0x1000_180B = MATCH_BSATS. Correct.
+Let's verify: 0x10C5_B50B & 0xFE00_707F = 0x1000_300B = MATCH_BSATS. Correct.
 ```
 
 ### Part 2: C Inline Assembly Wrapper
@@ -181,7 +181,7 @@ uint32_t bsats_reference_branchless(uint32_t value, uint32_t shamt) {
 
 **Registration in Spike (riscv/encoding.h):**
 ```c
-#define MATCH_BSATS 0x1000180B
+#define MATCH_BSATS 0x1000300B
 #define MASK_BSATS  0xFE00707F
 DECLARE_INSN(bsats, MATCH_BSATS, MASK_BSATS)
 ```
@@ -395,14 +395,14 @@ MV   t0, t1             # saturate
 MV   a0, t0
 ```
 
-This is 4-5 instructions with a branch. With the B extension (`Zbb`), `MIN` would be available, reducing to:
+This is 4-5 instructions with a branch. With the B extension (`Zbb`), `MINU` (unsigned minimum; signed `MIN` would mis-handle shifted values ≥ 2^31 when shamt = 0) would be available, reducing to:
 ```
 SRL  a0, a0, a1
 LI   t0, 0xFFFF
-MIN  a0, a0, t0         # from Zbb extension
+MINU a0, a0, t0         # from Zbb extension
 ```
 
-Three instructions, no branch — better than the base sequence, but still 3x the code size and latency of the custom instruction. The custom instruction is most justified in a tight ISR loop where the 2-instruction savings per loop iteration translates to a significant cycle count reduction.
+Three instructions (four once `LI 0xFFFF` expands to LUI + ADDI), no branch — better than the base sequence, but still 3-4x the code size and latency of the custom instruction. The custom instruction is most justified in a tight ISR loop where the 2-instruction savings per loop iteration translates to a significant cycle count reduction.
 
 ### Extending to RV64
 

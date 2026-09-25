@@ -179,8 +179,8 @@ Per 1000 instructions:
   Pattern A mispredictions: 144 * 0.03 = 4.32 ≈ 4 mispredictions
   Pattern B mispredictions: 96  * 0.28 = 26.88 ≈ 27 mispredictions
 
-  Total mispredictions: 4 + 27 = 31 mispredictions per 1000 branches
-  (Equivalently: 31 per 1000 * 0.24 = 31 per 240 branches = 12.9% -- confirms 13%)
+  Total mispredictions: 4 + 27 = 31 mispredictions per 1000 instructions (240 branches)
+  (Equivalently: 31 / 240 = 12.9% -- confirms 13%, i.e. 130 mispredictions per 1000 conditional branches)
 
 Wasted cycles per 1000 instructions:
   = mispredictions * penalty
@@ -261,7 +261,7 @@ In our workload:
 - Pattern B branches are weakly and irregularly taken (37.5%) and would push toward "Weakly Not Taken."
 - If a Pattern A branch and a Pattern B branch alias to the same BHT entry, they interfere, reducing both to ~72-73% accuracy (close to a coin flip for the mixed entry).
 
-A per-branch predictor (Strategy 5) assigns each branch its own entry, preventing aliasing. Pattern A branches train to "Strongly Taken" and stay there; Pattern B branches have independent counters that track their own history. The result: 97% for Pattern A (close to the 95% theoretical maximum) and 72% for Pattern B (limited by the branch's inherent irregularity).
+A per-branch predictor (Strategy 5) assigns each branch its own entry, preventing aliasing. Pattern A branches train to "Strongly Taken" and stay there; Pattern B branches have independent counters that track their own history. The result: 97% for Pattern A (better than the 95% a static always-taken prediction would give) and 72% for Pattern B (limited by the branch's inherent irregularity).
 
 ### Impact of warm-up on per-branch predictor accuracy
 

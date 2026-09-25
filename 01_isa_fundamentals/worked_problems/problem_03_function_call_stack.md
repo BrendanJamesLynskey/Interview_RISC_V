@@ -123,7 +123,8 @@ a3 = 6  (y1)
 
 `dot_product` runs its prologue (see Part C for full details):
 ```
-sp decremented to save ra, s0, s1, s2 (16 bytes: sp = 0xBFFC - 16 = 0xBFEC)
+sp decremented to save ra, s0, s1, s2 (16 bytes: sp = 0xBFEC - 16 = 0xBFDC;
+  main's own prologue has already moved sp from 0xBFFC to 0xBFEC, see Part D)
 ra = return address to main
 s1 = a1 = 4  (y0, saved before first call)
 s2 = a3 = 6  (y1, saved before first call)
@@ -135,14 +136,14 @@ At the point `JAL ra, multiply` executes (first call):
 - `a0 = 3` (argument: x0)
 - `a1 = 5` (argument: x1)
 - `ra` is about to be set to `PC_of_jal + 4` (the instruction after JAL in dot_product)
-- `sp = 0xBFEC`
+- `sp = 0xBFDC`
 
 **Register values when `multiply(x0, x1)` starts executing:**
 
 ```
 Register   Value      Explanation
 ---------  ---------  --------------------------------------------------
-sp         0xBFEC     dot_product's frame is allocated; multiply is leaf
+sp         0xBFDC     dot_product's frame is allocated; multiply is leaf
 ra         0x????     Just set by JAL to (address of JAL instruction + 4)
                       i.e., the return address pointing back into dot_product
 a0         3          x0 argument (first call: multiply(3, 5))
@@ -154,20 +155,23 @@ a0         3          first argument to multiply
 a1         5          second argument to multiply
 ```
 
-**Stack contents from `sp` (0xBFEC) to 0xBFFB:**
+**Stack contents from `sp` (0xBFDC) to 0xBFFB:**
 
 ```
 Address    Value      Contents
 ---------  ---------  --------------------------------------------------
-0xBFEB     (n/a)      below sp, unused
-0xBFEC     s2 saved   6  (y1 = a3 from main's call, saved by dot_product)
-0xBFF0     s1 saved   4  (y0 = a1 from main's call, saved by dot_product)
-0xBFF4     s0 saved   (previous s0 value from main/startup — irrelevant)
-0xBFF8     ra saved   return address back to main (dot_product's saved ra)
-0xBFFC     (empty)    above dot_product's frame: main's frame territory
+0xBFDB     (n/a)      below sp, unused
+0xBFDC     s2 saved   caller's previous s2 value (saved by dot_product)
+0xBFE0     s1 saved   caller's previous s1 value (saved by dot_product)
+0xBFE4     s0 saved   caller's previous s0 value (saved by dot_product)
+0xBFE8     ra saved   return address back to main (dot_product's saved ra)
+0xBFEC     (padding)  main's frame: unused
+0xBFF0     (padding)  main's frame: unused
+0xBFF4     (padding)  main's frame: unused
+0xBFF8     ra saved   main's saved return address (back to startup)
 ```
 
-Note: `multiply` does not touch `sp`, so the stack during `multiply`'s execution is identical to the stack at the point of the call. The 4 saved values are from `dot_product`'s prologue.
+Note: `multiply` does not touch `sp`, so the stack during `multiply`'s execution is identical to the stack at the point of the call. The prologue stores s0–s2 *before* `mv s1, a1` / `mv s2, a3`, so the stack holds the caller's old values; y0 = 4 and y1 = 6 live in the registers s1 and s2, not on the stack.
 
 ---
 
@@ -248,20 +252,20 @@ dot_product:
 ```
 Point                    a0    a1    s0    s1    s2    ra          sp
 -----------------------  ----  ----  ----  ----  ----  ----------  ------
-dot_product entry        3     4     ?     ?     ?     ret_main    0xBFFC
-after prologue           3     4     saved saved saved ret_main    0xBFEC
-after mv s1,a1; mv s2,a3 3     4     saved 4     6     ret_main    0xBFEC
-after mv a1,a2           3     5     saved 4     6     ret_main    0xBFEC
---- call multiply ---     3     5     saved 4     6     -> dp+4     0xBFEC
-multiply executes        15    5     saved 4     6     dp+4        0xBFEC
---- return from multiply  15    5     saved 4     6     dp+4        0xBFEC
-after mv s0,a0           15    5     15    4     6     dp+4        0xBFEC
-after mv a0,s1; mv a1,s2 4     6     15    4     6     dp+4        0xBFEC
+dot_product entry        3     4     ?     ?     ?     ret_main    0xBFEC
+after prologue           3     4     saved saved saved ret_main    0xBFDC
+after mv s1,a1; mv s2,a3 3     4     saved 4     6     ret_main    0xBFDC
+after mv a1,a2           3     5     saved 4     6     ret_main    0xBFDC
+--- call multiply ---     3     5     saved 4     6     -> dp+4     0xBFDC
+multiply executes        15    5     saved 4     6     dp+4        0xBFDC
+--- return from multiply  15    5     saved 4     6     dp+4        0xBFDC
+after mv s0,a0           15    5     15    4     6     dp+4        0xBFDC
+after mv a0,s1; mv a1,s2 4     6     15    4     6     dp+4        0xBFDC
 --- call multiply (2nd) ---
-multiply executes        24    6     15    4     6     dp+?        0xBFEC
---- return from multiply  24    6     15    4     6     dp+?        0xBFEC
-after add a0,s0,a0       39    6     15    4     6     dp+?        0xBFEC
-after epilogue           39    6     s0    s1    s2    ret_main    0xBFFC
+multiply executes        24    6     15    4     6     dp+?        0xBFDC
+--- return from multiply  24    6     15    4     6     dp+?        0xBFDC
+after add a0,s0,a0       39    6     15    4     6     dp+?        0xBFDC
+after epilogue           39    6     s0    s1    s2    ret_main    0xBFEC
 ```
 
 Final return value: `a0 = 39 = 3*5 + 4*6 = 15 + 24`.
@@ -366,11 +370,11 @@ Address  Value                    Owner          Description
 0xBFE3                                            |
 0xBFE2                                            |
 0xBFE1                                            |
-0xBFE0   4  (= y0)                dot_product    saved s1 (= 4, y0 argument)
+0xBFE0   <prev value of s1>       dot_product    saved s1 (caller's value; y0 = 4 is in s1)
 0xBFDF                                            |
 0xBFDE                                            |
 0xBFDD                                            |
-0xBFDC   6  (= y1)                dot_product    saved s2 (= 6, y1 argument)
+0xBFDC   <prev value of s2>       dot_product    saved s2 (caller's value; y1 = 6 is in s2)
          ^                                        <- sp = 0xBFDC during multiply
 ```
 
@@ -461,7 +465,7 @@ The original `dot_product` received its arguments by value and had to save 4 sca
 
 **Could we save fewer registers?**
 
-Yes, if we loaded all four values before the first call and stored them in saved registers:
+Not by pre-loading. If we loaded all four values before the first call and stored them in saved registers:
 ```assembly
 # Alternative: pre-load all 4 values
 lw   s0, 0(a0)   # s0 = vec_a[0]
@@ -556,7 +560,7 @@ Step 8: CRASH / undefined behaviour
     - s0, s1, s2 were just restored but are now being used again
     - sp has been incremented back (+12) so the stack is corrupt
     - The second 'add' executes: a0 = s0_restored + a0 = ?_old + 39 = garbage
-    - Hits the second 'epilogue' which subtracts a different stack offset
+    - Hits the epilogue again, which reloads s0–s2 from the wrong addresses and adds 12 to sp again
     - ret again: jumps to addr_after_second_jal again
     - This is an INFINITE LOOP or leads to a stack underflow crash
 ```
